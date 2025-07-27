@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback, ReactNode } from 'react';
-import { userAPI, incomeAPI, expensesAPI, suggestionsAPI, utils, User, Expense, ProductSuggestion } from '../services/api';
+import { userAPI, incomeAPI, expensesAPI, suggestionsAPI, utils, User, Expense, ProductSuggestion, IncomeEntry } from '../services/api';
 
 // State interface
 interface AppState {
@@ -9,9 +9,9 @@ interface AppState {
     currentMonth: string;
     loading: boolean;
     error: string | null;
-    incomes: any[];
-    expenses: any[];
-    emis: any[];
+    incomes: IncomeEntry[];
+    expenses: Expense[];
+    emis: Expense[];
     suggestions: ProductSuggestion[];
 }
 
@@ -21,15 +21,15 @@ type Action =
     | { type: 'SET_ERROR'; payload: string | null }
     | { type: 'SET_USER'; payload: User }
     | { type: 'SET_CURRENT_MONTH'; payload: string }
-    | { type: 'SET_INCOMES'; payload: any[] }
-    | { type: 'SET_EXPENSES'; payload: any[] }
-    | { type: 'SET_EMIS'; payload: any[] }
+    | { type: 'SET_INCOMES'; payload: IncomeEntry[] }
+    | { type: 'SET_EXPENSES'; payload: Expense[] }
+    | { type: 'SET_EMIS'; payload: Expense[] }
     | { type: 'SET_SUGGESTIONS'; payload: ProductSuggestion[] }
-    | { type: 'ADD_INCOME'; payload: any }
-    | { type: 'UPDATE_INCOME'; payload: any }
+    | { type: 'ADD_INCOME'; payload: IncomeEntry }
+    | { type: 'UPDATE_INCOME'; payload: IncomeEntry }
     | { type: 'DELETE_INCOME'; payload: string }
-    | { type: 'ADD_EXPENSE'; payload: any }
-    | { type: 'UPDATE_EXPENSE'; payload: any }
+    | { type: 'ADD_EXPENSE'; payload: Expense }
+    | { type: 'UPDATE_EXPENSE'; payload: Expense }
     | { type: 'DELETE_EXPENSE'; payload: string }
     | { type: 'ADD_SUGGESTION'; payload: ProductSuggestion }
     | { type: 'DELETE_SUGGESTION'; payload: string };
@@ -127,21 +127,21 @@ interface DataContextType {
     dispatch: React.Dispatch<Action>;
     // User actions
     loadUser: (uid: string) => Promise<void>;
-    createUser: (userData: any) => Promise<void>;
-    updateUser: (uid: string, updateData: any) => Promise<void>;
+    createUser: (userData: Partial<User>) => Promise<void>;
+    updateUser: (uid: string, updateData: Partial<User>) => Promise<void>;
     // Income actions
     loadIncome: (uid: string, month?: string) => Promise<void>;
-    addIncome: (uid: string, month: string, incomeEntry: any) => Promise<void>;
-    updateIncome: (uid: string, month: string, incomeId: string, incomeEntry: any) => Promise<void>;
+    addIncome: (uid: string, month: string, incomeEntry: Omit<IncomeEntry, '_id'>) => Promise<void>;
+    updateIncome: (uid: string, month: string, incomeId: string, incomeEntry: Partial<IncomeEntry>) => Promise<void>;
     deleteIncome: (uid: string, month: string, incomeId: string) => Promise<void>;
     // Expense actions
     loadExpenses: (uid: string, month?: string) => Promise<void>;
-    addExpense: (uid: string, month: string, expense: any) => Promise<void>;
-    updateExpense: (uid: string, month: string, expenseId: string, expense: any) => Promise<void>;
+    addExpense: (uid: string, month: string, expense: Omit<Expense, '_id'>) => Promise<void>;
+    updateExpense: (uid: string, month: string, expenseId: string, expense: Partial<Expense>) => Promise<void>;
     deleteExpense: (uid: string, month: string, expenseId: string) => Promise<void>;
     // Suggestion actions
     loadSuggestions: (uid: string, limit?: number) => Promise<void>;
-    createSuggestion: (suggestionData: any) => Promise<void>;
+    createSuggestion: (suggestionData: Omit<ProductSuggestion, '_id' | 'suggestedAt'>) => Promise<void>;
     deleteSuggestion: (uid: string, suggestionId: string) => Promise<void>;
     // Utility actions
     setCurrentMonth: (month: string) => void;
@@ -177,18 +177,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
             dispatch({ type: 'SET_INCOMES', payload: monthData.income || [] });
             dispatch({ type: 'SET_EXPENSES', payload: monthData.expenses || [] });
-            dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: any) => exp.type === 'emi') });
+            dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: Expense) => exp.type === 'emi') });
             console.log('✅ User data loaded successfully');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('❌ Error loading user:', error);
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
     }, []);
 
-    const createUser = useCallback(async (userData: any) => {
+    const createUser = useCallback(async (userData: Partial<User>) => {
         console.log('createUser called with data:', userData);
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
@@ -197,9 +197,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
             const user = await userAPI.createUser(userData);
             console.log('User created successfully:', user._id);
             dispatch({ type: 'SET_USER', payload: user });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error creating user:', error);
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });

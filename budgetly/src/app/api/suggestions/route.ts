@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '../../../../lib/mongoose';
-import ProductSuggestion from '../../../../models/ProductSuggestion';
+import ProductSuggestion, { IProductSuggestionModel } from '../../../../models/ProductSuggestion';
 
 export async function GET(request: NextRequest) {
     try {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'UID is required' }, { status: 400 });
         }
 
-        const suggestions = await ProductSuggestion.findByUser(uid, parseInt(limit));
+        const suggestions = await (ProductSuggestion as IProductSuggestionModel).findByUser(uid, parseInt(limit));
 
         return NextResponse.json({ suggestions });
     } catch (error) {

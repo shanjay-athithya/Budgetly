@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '../../../../lib/mongoose';
-import User from '../../../../models/User';
+import User, { IUserModel } from '../../../../models/User';
+import { Expense } from '../../services/api';
 
 export async function GET(request: NextRequest) {
     try {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'UID is required' }, { status: 400 });
         }
 
-        const user = await User.findByUID(uid);
+        const user = await (User as IUserModel).findByUID(uid);
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -26,20 +27,20 @@ export async function GET(request: NextRequest) {
         }
 
         // Return all expenses from all months
-        const allExpenses = [];
+        const allExpenses: Array<Expense & { month: string }> = [];
         for (const [monthKey, monthData] of Object.entries(user.months)) {
             monthData.expenses.forEach(expense => {
                 allExpenses.push({
-                    ...expense.toObject(),
+                    ...expense,
                     month: monthKey
                 });
             });
         }
 
         return NextResponse.json({ expenses: allExpenses });
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Error fetching expenses:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
     }
 }
 
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'UID, month, and expense are required' }, { status: 400 });
         }
 
-        const user = await User.findByUID(uid);
+        const user = await (User as IUserModel).findByUID(uid);
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -100,9 +101,9 @@ export async function POST(request: NextRequest) {
         console.log('✅ Expense added successfully');
 
         return NextResponse.json({ success: true, user: updatedUser });
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Error adding expense:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
     }
 }
 
@@ -117,7 +118,7 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'UID, month, expenseId, and expense are required' }, { status: 400 });
         }
 
-        const user = await User.findByUID(uid);
+        const user = await (User as IUserModel).findByUID(uid);
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -125,7 +126,7 @@ export async function PUT(request: NextRequest) {
 
         const currentMonths = user.months || {};
         const currentMonthData = currentMonths[month] || { income: [], expenses: [] };
-        const expenseIndex = currentMonthData.expenses.findIndex((e: any) => {
+        const expenseIndex = currentMonthData.expenses.findIndex((e) => {
             const itemId = e._id?.toString();
             const searchId = expenseId?.toString();
             return itemId === searchId;
@@ -150,9 +151,9 @@ export async function PUT(request: NextRequest) {
         );
 
         return NextResponse.json({ success: true, user: updatedUser });
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Error updating expense:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
     }
 }
 
@@ -167,7 +168,7 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'UID, month, and expenseId are required' }, { status: 400 });
         }
 
-        const user = await User.findByUID(uid);
+        const user = await (User as IUserModel).findByUID(uid);
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -177,9 +178,9 @@ export async function DELETE(request: NextRequest) {
         const currentMonthData = currentMonths[month] || { income: [], expenses: [] };
 
         console.log('🔍 Looking for expense with ID:', expenseId);
-        console.log('🔍 Available expense entries:', currentMonthData.expenses.map((e: any) => ({ id: e._id, label: e.label })));
+        console.log('🔍 Available expense entries:', currentMonthData.expenses.map((e) => ({ id: e._id, label: e.label })));
 
-        const expenseIndex = currentMonthData.expenses.findIndex((e: any) => {
+        const expenseIndex = currentMonthData.expenses.findIndex((e) => {
             const itemId = e._id?.toString();
             const searchId = expenseId?.toString();
             return itemId === searchId;
@@ -200,8 +201,8 @@ export async function DELETE(request: NextRequest) {
         );
 
         return NextResponse.json({ success: true, user: updatedUser });
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Error deleting expense:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
     }
 } 

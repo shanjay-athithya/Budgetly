@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '../../../../lib/mongoose';
-import User from '../../../../models/User';
+import User, { IUserModel } from '../../../../models/User';
 
 export async function GET(request: NextRequest) {
     try {
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'UID is required' }, { status: 400 });
         }
 
-        const user = await User.findByUID(uid);
+        const user = await (User as IUserModel).findByUID(uid);
 
         if (!user) {
             console.log('GET /api/user - User not found for UID:', uid);
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'UID, email, and name are required' }, { status: 400 });
         }
 
-        const user = await User.findOrCreate({
+        const user = await (User as IUserModel).findOrCreate({
             uid,
             email,
             name,
@@ -99,7 +99,7 @@ export async function PATCH(request: NextRequest) {
 
         if (action === 'migrate-income') {
             console.log('Triggering income structure migration...');
-            const migratedCount = await User.migrateIncomeStructure();
+            const migratedCount = await (User as IUserModel).migrateIncomeStructure();
             return NextResponse.json({
                 success: true,
                 message: `Migration completed. ${migratedCount} users migrated.`

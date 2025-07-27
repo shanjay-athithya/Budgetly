@@ -16,19 +16,21 @@ export interface User {
     updatedAt: Date;
 }
 
+export interface IncomeEntry {
+    _id?: string;
+    label: string;
+    amount: number;
+    source: string;
+    date: Date;
+}
+
 export interface MonthData {
-    income: Array<{
-        _id?: any;
-        label: string;
-        amount: number;
-        source: string;
-        date: Date;
-    }>;
+    income: IncomeEntry[];
     expenses: Expense[];
 }
 
 export interface Expense {
-    _id?: any;
+    _id?: string;
     label: string;
     amount: number;
     category: string;
@@ -107,7 +109,7 @@ export const userAPI = {
 
 // Income API
 export const incomeAPI = {
-    async getIncome(uid: string, month?: string): Promise<{ income: any[], totalIncome: number }> {
+    async getIncome(uid: string, month?: string): Promise<{ income: IncomeEntry[], totalIncome: number }> {
         const url = month
             ? `/api/income?uid=${uid}&month=${month}`
             : `/api/income?uid=${uid}`;
@@ -121,7 +123,7 @@ export const incomeAPI = {
         return response.json();
     },
 
-    async addIncome(uid: string, month: string, incomeEntry: any): Promise<{ success: boolean; user: User }> {
+    async addIncome(uid: string, month: string, incomeEntry: Omit<IncomeEntry, '_id'>): Promise<{ success: boolean; user: User }> {
         const response = await fetch('/api/income', {
             method: 'POST',
             headers: {
@@ -137,7 +139,7 @@ export const incomeAPI = {
         return response.json();
     },
 
-    async updateIncome(uid: string, month: string, incomeId: string, incomeEntry: any): Promise<{ success: boolean; user: User }> {
+    async updateIncome(uid: string, month: string, incomeId: string, incomeEntry: Partial<IncomeEntry>): Promise<{ success: boolean; user: User }> {
         const response = await fetch('/api/income', {
             method: 'PUT',
             headers: {

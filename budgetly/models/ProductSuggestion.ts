@@ -74,4 +74,10 @@ ProductSuggestionSchema.statics.getStats = function (uid: string) {
     ]);
 };
 
-export default mongoose.models.ProductSuggestion || mongoose.model<IProductSuggestion>('ProductSuggestion', ProductSuggestionSchema); 
+// Static methods interface
+export interface IProductSuggestionModel extends mongoose.Model<IProductSuggestion> {
+    findByUser(uid: string, limit?: number): Promise<IProductSuggestion[]>;
+    getStats(uid: string): Promise<any>;
+}
+
+export default mongoose.models.ProductSuggestion as IProductSuggestionModel || mongoose.model<IProductSuggestion, IProductSuggestionModel>('ProductSuggestion', ProductSuggestionSchema); 

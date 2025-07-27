@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '../../../../lib/mongoose';
-import User from '../../../../models/User';
+import User, { IUserModel } from '../../../../models/User';
 
 export async function GET(request: NextRequest) {
     try {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'UID is required' }, { status: 400 });
         }
 
-        const user = await User.findByUID(uid);
+        const user = await (User as IUserModel).findByUID(uid);
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -31,12 +31,12 @@ export async function GET(request: NextRequest) {
             console.log('📋 Month data for', month, ':', JSON.stringify(monthData, null, 2));
             return NextResponse.json({
                 income: monthData.income || [],
-                totalIncome: (monthData.income || []).reduce((sum: number, item: any) => sum + item.amount, 0)
+                totalIncome: (monthData.income || []).reduce((sum: number, item) => sum + item.amount, 0)
             });
         }
 
         // Return all months data
-        const monthsData = Object.fromEntries(user.months);
+        const monthsData = user.months;
         console.log('📊 All months data:', JSON.stringify(monthsData, null, 2));
         return NextResponse.json(monthsData);
     } catch (error) {
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'UID, month, and incomeEntry are required' }, { status: 400 });
         }
 
-        const user = await User.findByUID(uid);
+        const user = await (User as IUserModel).findByUID(uid);
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -115,7 +115,7 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'UID, month, incomeId, and incomeEntry are required' }, { status: 400 });
         }
 
-        const user = await User.findByUID(uid);
+        const user = await (User as IUserModel).findByUID(uid);
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -124,12 +124,12 @@ export async function PUT(request: NextRequest) {
         // Direct MongoDB update approach for editing
         const currentMonths = user.months || {};
         const currentMonthData = currentMonths[month] || { income: [], expenses: [] };
-        
+
         console.log('🔍 Looking for income with ID:', incomeId);
-        console.log('🔍 Available income entries:', currentMonthData.income.map((item: any) => ({ id: item._id, label: item.label })));
-        
+        console.log('🔍 Available income entries:', currentMonthData.income.map((item) => ({ id: item._id, label: item.label })));
+
         // Convert string ID to ObjectId for comparison if needed
-        const incomeIndex = currentMonthData.income.findIndex((item: any) => {
+        const incomeIndex = currentMonthData.income.findIndex((item) => {
             const itemId = item._id?.toString();
             const searchId = incomeId?.toString();
             return itemId === searchId;
@@ -171,7 +171,7 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'UID, month, and incomeId are required' }, { status: 400 });
         }
 
-        const user = await User.findByUID(uid);
+        const user = await (User as IUserModel).findByUID(uid);
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -180,7 +180,7 @@ export async function DELETE(request: NextRequest) {
         // Direct MongoDB update approach for deleting
         const currentMonths = user.months || {};
         const currentMonthData = currentMonths[month] || { income: [], expenses: [] };
-        currentMonthData.income = currentMonthData.income.filter((item: any) => {
+        currentMonthData.income = currentMonthData.income.filter((item) => {
             const itemId = item._id?.toString();
             const searchId = incomeId?.toString();
             return itemId !== searchId;

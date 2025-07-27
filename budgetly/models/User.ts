@@ -38,14 +38,14 @@ export interface IUser extends Document {
     months: {
         [monthKey: string]: {
             income: Array<{
-                _id?: any;
+                _id?: mongoose.Types.ObjectId;
                 label: string;
                 amount: number;
                 source: string;
                 date: Date;
             }>;
             expenses: Array<{
-                _id?: any;
+                _id?: mongoose.Types.ObjectId;
                 label: string;
                 amount: number;
                 category: string;
@@ -64,16 +64,16 @@ export interface IUser extends Document {
     updatedAt: Date;
 
     // Instance methods
-    addIncome(monthKey: string, incomeEntry: any): Promise<IUser>;
-    addExpense(monthKey: string, expense: any): Promise<IUser>;
-    getMonthData(monthKey: string): any;
+    addIncome(monthKey: string, incomeEntry: Omit<{ _id?: mongoose.Types.ObjectId; label: string; amount: number; source: string; date: Date }, '_id'>): Promise<IUser>;
+    addExpense(monthKey: string, expense: Omit<{ _id?: mongoose.Types.ObjectId; label: string; amount: number; category: string; date: Date; type: 'one-time' | 'emi'; emiDetails?: { duration: number; remainingMonths: number; monthlyAmount: number; startedOn: Date } }, '_id'>): Promise<IUser>;
+    getMonthData(monthKey: string): { income: Array<{ _id?: mongoose.Types.ObjectId; label: string; amount: number; source: string; date: Date }>; expenses: Array<{ _id?: mongoose.Types.ObjectId; label: string; amount: number; category: string; date: Date; type: 'one-time' | 'emi'; emiDetails?: { duration: number; remainingMonths: number; monthlyAmount: number; startedOn: Date } }> };
     updateSavings(amount: number): Promise<IUser>;
 }
 
 // Static methods interface
 export interface IUserModel extends mongoose.Model<IUser> {
     findByUID(uid: string): Promise<IUser | null>;
-    findOrCreate(userData: any): Promise<IUser>;
+    findOrCreate(userData: Partial<IUser>): Promise<IUser>;
     migrateIncomeStructure(): Promise<number>;
 }
 
@@ -262,7 +262,7 @@ UserSchema.methods.updateSavings = function (amount: number) {
 // Static method to find user by UID
 UserSchema.statics.findByUID = function (uid: string) {
     console.log('findByUID called for UID:', uid);
-    return this.findOne({ uid }).then((user: any) => {
+    return this.findOne({ uid }).then((user: IUser | null) => {
         if (user) {
             console.log('findByUID - User found with months:', JSON.stringify(user.months, null, 2));
         }
@@ -271,7 +271,7 @@ UserSchema.statics.findByUID = function (uid: string) {
 };
 
 // Static method to find or create user
-UserSchema.statics.findOrCreate = async function (userData: any) {
+UserSchema.statics.findOrCreate = async function (userData: Partial<IUser>) {
     console.log('findOrCreate called with data:', userData);
     let user = await this.findOne({ uid: userData.uid });
     if (!user) {
@@ -297,7 +297,7 @@ UserSchema.statics.migrateIncomeStructure = async function () {
         // Check each month for old income structure
         for (const [monthKey, monthData] of Object.entries(user.months)) {
             if (monthData && typeof monthData === 'object' && 'income' in monthData) {
-                const monthDataObj = monthData as any;
+                const monthDataObj = monthData as { income: number | Array<{ _id?: mongoose.Types.ObjectId; label: string; amount: number; source: string; date: Date }> };
                 if (typeof monthDataObj.income === 'number') {
                     console.log(`Migrating user ${user.uid} month ${monthKey} from income number to array`);
                     const oldIncomeAmount = monthDataObj.income;
