@@ -16,6 +16,7 @@ import { useData } from '../context/DataContext';
 
 interface EMIEntry {
     id: string;
+    expenseId?: string; // The actual expense _id from database
     productName: string;
     totalAmount: number;
     duration: number;
@@ -23,6 +24,7 @@ interface EMIEntry {
     monthlyInstallment: number;
     paidMonths: number;
     isActive: boolean;
+    month?: string; // The month this EMI belongs to
 }
 
 interface Toast {
@@ -32,7 +34,7 @@ interface Toast {
 }
 
 export default function EMIManager() {
-    const { state } = useData();
+    const { state, addExpense, updateExpense, deleteExpense } = useData();
     const { user, currentMonth } = state;
 
     const [localEMIs, setLocalEMIs] = useState<EMIEntry[]>([]);
@@ -59,13 +61,15 @@ export default function EMIManager() {
                     if (expense.type === 'emi' && expense.emiDetails) {
                         allEMIs.push({
                             id: expense._id || Math.random().toString(),
+                            expenseId: expense._id,
                             productName: expense.label,
                             totalAmount: expense.amount,
                             duration: expense.emiDetails.duration,
                             startMonth: expense.emiDetails.startedOn.toString().slice(0, 7),
                             monthlyInstallment: expense.emiDetails.monthlyAmount,
                             paidMonths: expense.emiDetails.duration - expense.emiDetails.remainingMonths,
-                            isActive: expense.emiDetails.remainingMonths > 0
+                            isActive: expense.emiDetails.remainingMonths > 0,
+                            month: month
                         });
                     }
                 });
@@ -149,6 +153,11 @@ export default function EMIManager() {
     const handleSave = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (!user) {
+            addToast('User not found', 'error');
+            return;
+        }
+
         if (!formData.productName || !formData.totalAmount || !formData.duration || !formData.startMonth) {
             addToast('Please fill in all fields', 'error');
             return;
@@ -166,38 +175,51 @@ export default function EMIManager() {
 
         try {
             const monthlyInstallment = totalAmount / duration;
-            const newEMI: EMIEntry = {
-                id: editingEMI?.id || Math.random().toString(),
-                productName: formData.productName,
-                totalAmount,
-                duration,
-                startMonth: formData.startMonth,
-                monthlyInstallment,
-                paidMonths: editingEMI?.paidMonths || 0,
-                isActive: true
+            const startDate = new Date(formData.startMonth + '-01');
+
+            const expenseData = {
+                label: formData.productName,
+                amount: totalAmount,
+                category: 'EMI',
+                date: startDate,
+                type: 'emi' as const,
+                emiDetails: {
+                    duration: duration,
+                    remainingMonths: editingEMI ? editingEMI.duration - editingEMI.paidMonths : duration,
+                    monthlyAmount: monthlyInstallment,
+                    startedOn: startDate
+                }
             };
 
-            if (editingEMI) {
+            if (editingEMI && editingEMI.expenseId) {
                 // Update existing EMI
-                setLocalEMIs(prev => prev.map(emi =>
-                    emi.id === editingEMI.id ? newEMI : emi
-                ));
+                await updateExpense(user.uid, editingEMI.month || currentMonth, editingEMI.expenseId, expenseData);
                 addToast('EMI updated successfully!', 'success');
             } else {
                 // Add new EMI
-                setLocalEMIs(prev => [...prev, newEMI]);
+                await addExpense(user.uid, currentMonth, expenseData);
                 addToast('EMI added successfully!', 'success');
             }
 
             closeModal();
-        } catch (error) {
-            addToast('Failed to save EMI. Please try again.', 'error');
+        } catch (error: any) {
+            addToast(error.message || 'Failed to save EMI. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
-    }, [formData, editingEMI, addToast, closeModal]);
+    }, [user, formData, editingEMI, currentMonth, addExpense, updateExpense, addToast, closeModal]);
 
-    const handleDelete = useCallback(async (id: string) => {
+    const handleDelete = useCallback(async (emi: EMIEntry) => {
+        if (!user) {
+            addToast('User not found', 'error');
+            return;
+        }
+
+        if (!emi.expenseId) {
+            addToast('Cannot delete EMI - missing expense ID', 'error');
+            return;
+        }
+
         if (!confirm('Are you sure you want to delete this EMI?')) {
             return;
         }
@@ -205,25 +227,45 @@ export default function EMIManager() {
         setLoading(true);
 
         try {
-            setLocalEMIs(prev => prev.filter(emi => emi.id !== id));
+            await deleteExpense(user.uid, emi.month || currentMonth, emi.expenseId);
             addToast('EMI deleted successfully!', 'success');
-        } catch (error) {
-            addToast('Failed to delete EMI. Please try again.', 'error');
+        } catch (error: any) {
+            addToast(error.message || 'Failed to delete EMI. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
-    }, [addToast]);
+    }, [user, currentMonth, deleteExpense, addToast]);
 
-    const handleMarkAsPaid = useCallback((emi: EMIEntry) => {
-        const updatedEMI = {
-            ...emi,
-            paidMonths: Math.min(emi.paidMonths + 1, emi.duration),
-            isActive: emi.paidMonths + 1 < emi.duration
-        };
+    const handleMarkAsPaid = useCallback(async (emi: EMIEntry) => {
+        if (!user || !emi.expenseId) {
+            addToast('Cannot update EMI - missing user or expense ID', 'error');
+            return;
+        }
 
-        setLocalEMIs(prev => prev.map(e => e.id === emi.id ? updatedEMI : e));
-        addToast('Payment recorded successfully!', 'success');
-    }, [addToast]);
+        const newPaidMonths = Math.min(emi.paidMonths + 1, emi.duration);
+        const newRemainingMonths = Math.max(0, emi.duration - newPaidMonths);
+
+        try {
+            const expenseData = {
+                label: emi.productName,
+                amount: emi.totalAmount,
+                category: 'EMI',
+                date: new Date(emi.startMonth + '-01'),
+                type: 'emi' as const,
+                emiDetails: {
+                    duration: emi.duration,
+                    remainingMonths: newRemainingMonths,
+                    monthlyAmount: emi.monthlyInstallment,
+                    startedOn: new Date(emi.startMonth + '-01')
+                }
+            };
+
+            await updateExpense(user.uid, emi.month || currentMonth, emi.expenseId, expenseData);
+            addToast('Payment recorded successfully!', 'success');
+        } catch (error: any) {
+            addToast(error.message || 'Failed to record payment. Please try again.', 'error');
+        }
+    }, [user, currentMonth, updateExpense, addToast]);
 
     const formatDate = useCallback((dateString: string) => {
         return new Date(dateString + '-01').toLocaleDateString('en-US', {
@@ -329,7 +371,7 @@ export default function EMIManager() {
                                                 <PencilIcon className="h-4 w-4" />
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(emi.id)}
+                                                onClick={() => handleDelete(emi)}
                                                 className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
                                                 title="Delete EMI"
                                             >
@@ -508,8 +550,8 @@ export default function EMIManager() {
                     <div
                         key={toast.id}
                         className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' :
-                                toast.type === 'error' ? 'bg-red-500 text-white' :
-                                    'bg-blue-500 text-white'
+                            toast.type === 'error' ? 'bg-red-500 text-white' :
+                                'bg-blue-500 text-white'
                             }`}
                     >
                         {toast.message}
