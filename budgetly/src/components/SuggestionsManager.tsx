@@ -183,7 +183,7 @@ export default function SuggestionsManager() {
         const totalEMIs = existingEMIs + monthlyEMI;
         if (totalEMIs > monthlyIncome * 0.4) {
             suggestion = 'risky';
-            reasons.push(`Total EMIs ($${totalEMIs.toLocaleString()}) exceed 40% of monthly income`);
+            reasons.push(`Total EMIs (₹${totalEMIs.toLocaleString()}) exceed 40% of monthly income`);
         }
 
         // Rule 3: Check if expense ratio is already high
@@ -196,7 +196,7 @@ export default function SuggestionsManager() {
         const remainingSavings = savings - fullPrice;
         if (remainingSavings < monthlyIncome * 0.1) {
             suggestion = suggestion === 'good' ? 'moderate' : suggestion;
-            reasons.push(`Remaining savings ($${remainingSavings.toLocaleString()}) below 10% of income`);
+            reasons.push(`Remaining savings (₹${remainingSavings.toLocaleString()}) below 10% of income`);
         }
 
         // Determine final suggestion
@@ -275,12 +275,12 @@ export default function SuggestionsManager() {
 
         // Check for reasonable limits
         if (fullPrice > 10000000) { // 10 million max
-            addToast('Price cannot exceed $10,000,000', 'error');
+            addToast('Price cannot exceed ₹10,000,000', 'error');
             return;
         }
 
         if (monthlyEMI > 10000000) { // 1M max monthly EMI
-            addToast('Monthly EMI cannot exceed $1,000,000', 'error');
+            addToast('Monthly EMI cannot exceed ₹1,000,000', 'error');
             return;
         }
 
@@ -422,7 +422,7 @@ export default function SuggestionsManager() {
                         </div>
                         <div>
                             <p className="text-gray-400 text-sm">Monthly Income</p>
-                            <p className="text-xl font-bold text-white">${metrics.monthlyIncome.toLocaleString()}</p>
+                            <p className="text-xl font-bold text-white">₹{metrics.monthlyIncome.toLocaleString()}</p>
                         </div>
                     </div>
                 </div>
@@ -434,7 +434,7 @@ export default function SuggestionsManager() {
                         </div>
                         <div>
                             <p className="text-gray-400 text-sm">Monthly Expenses</p>
-                            <p className="text-xl font-bold text-white">${metrics.monthlyExpenses.toLocaleString()}</p>
+                            <p className="text-xl font-bold text-white">₹{metrics.monthlyExpenses.toLocaleString()}</p>
                         </div>
                     </div>
                 </div>
@@ -446,7 +446,7 @@ export default function SuggestionsManager() {
                         </div>
                         <div>
                             <p className="text-gray-400 text-sm">Existing EMIs</p>
-                            <p className="text-xl font-bold text-white">${metrics.existingEMIs.toLocaleString()}</p>
+                            <p className="text-xl font-bold text-white">₹{metrics.existingEMIs.toLocaleString()}</p>
                         </div>
                     </div>
                 </div>
@@ -487,11 +487,11 @@ export default function SuggestionsManager() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                             <div>
                                 <p className="text-gray-400 text-sm">Total Price</p>
-                                <p className="text-xl font-bold text-white">${currentSuggestion.fullPrice.toLocaleString()}</p>
+                                <p className="text-xl font-bold text-white">₹{currentSuggestion.fullPrice.toLocaleString()}</p>
                             </div>
                             <div>
                                 <p className="text-gray-400 text-sm">Monthly EMI</p>
-                                <p className="text-xl font-bold text-[#F70000]">${currentSuggestion.monthlyEMI.toFixed(0)}</p>
+                                <p className="text-xl font-bold text-[#F70000]">₹{currentSuggestion.monthlyEMI.toFixed(0)}</p>
                             </div>
                             <div>
                                 <p className="text-gray-400 text-sm">Duration</p>
@@ -548,7 +548,7 @@ export default function SuggestionsManager() {
                                         <div>
                                             <h4 className="text-white font-medium">{suggestion.productName}</h4>
                                             <p className="text-gray-400 text-sm">
-                                                ${suggestion.monthlyEMI.toFixed(0)}/month • {suggestion.duration} months
+                                                ₹{suggestion.monthlyEMI.toFixed(0)}/month • {suggestion.duration} months
                                             </p>
                                         </div>
                                     </div>
@@ -635,7 +635,7 @@ export default function SuggestionsManager() {
                                     {formData.inputType === 'fullPrice' ? 'Full Price' : 'Monthly EMI Amount'} *
                                 </label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</span>
+                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">₹</span>
                                     <input
                                         type="number"
                                         name={formData.inputType === 'fullPrice' ? 'fullPrice' : 'monthlyEMI'}
@@ -704,7 +704,7 @@ export default function SuggestionsManager() {
                                 <div className="bg-[#383838] rounded-lg p-4 border border-gray-600">
                                     <p className="text-gray-400 text-sm mb-1">Full Price Purchase</p>
                                     <p className="text-2xl font-bold text-[#F70000]">
-                                        ${parseFloat(formData.fullPrice).toLocaleString()}
+                                        ₹{parseFloat(formData.fullPrice).toLocaleString()}
                                     </p>
                                     <p className="text-gray-500 text-xs mt-1">One-time payment</p>
                                 </div>
@@ -714,7 +714,7 @@ export default function SuggestionsManager() {
                                 <div className="bg-[#383838] rounded-lg p-4 border border-gray-600">
                                     <p className="text-gray-400 text-sm mb-1">Total Price</p>
                                     <p className="text-2xl font-bold text-[#F70000]">
-                                        ${calculateTotalPrice(parseFloat(formData.monthlyEMI), parseInt(formData.duration)).toLocaleString()}
+                                        ₹{calculateTotalPrice(parseFloat(formData.monthlyEMI), parseInt(formData.duration)).toLocaleString()}
                                     </p>
                                 </div>
                             )}

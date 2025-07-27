@@ -388,9 +388,9 @@ export default function ReportsManager() {
                 // Fallback: copy to clipboard
                 await navigator.clipboard.writeText(
                     `Financial Report for ${formatDate(selectedMonth)}\n` +
-                    `Income: $${currentReport.totalIncome.toLocaleString()}\n` +
-                    `Expenses: $${currentReport.totalExpenses.toLocaleString()}\n` +
-                    `Savings: $${currentReport.savings.toLocaleString()}`
+                    `Income: ₹${currentReport.totalIncome.toLocaleString()}\n` +
+                    `Expenses: ₹${currentReport.totalExpenses.toLocaleString()}\n` +
+                    `Savings: ₹${currentReport.savings.toLocaleString()}`
                 );
                 addToast('Report details copied to clipboard!', 'success');
             }
@@ -475,7 +475,7 @@ export default function ReportsManager() {
                 cornerRadius: 8,
                 callbacks: {
                     label: function (context: TooltipItem<'bar'>) {
-                        return `${context.label}: $${context.parsed.y?.toLocaleString() ?? 0}`;
+                        return `${context.label}: ₹${context.parsed.y?.toLocaleString() ?? 0}`;
                     },
                 },
             },
@@ -490,9 +490,9 @@ export default function ReportsManager() {
                     },
                     callback: function (tickValue: string | number, _index: number, _ticks: Tick[]) {
                         if (typeof tickValue === 'number') {
-                            return '$' + tickValue.toLocaleString();
+                            return '₹' + tickValue.toLocaleString();
                         }
-                        return '$' + tickValue;
+                        return '₹' + tickValue;
                     },
                 },
                 grid: {
@@ -530,7 +530,7 @@ export default function ReportsManager() {
                         const value = context.parsed;
                         const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
                         const percentage = ((value / total) * 100).toFixed(1);
-                        return `${label}: $${value.toLocaleString()} (${percentage}%)`;
+                        return `${label}: ₹${value.toLocaleString()} (${percentage}%)`;
                     },
                 },
             },
@@ -644,7 +644,7 @@ export default function ReportsManager() {
                         </div>
                         <div>
                             <h3 className="text-gray-400 text-sm font-medium">Total Income</h3>
-                            <p className="text-3xl font-bold text-white">${currentReport.totalIncome.toLocaleString()}</p>
+                            <p className="text-3xl font-bold text-white">₹{currentReport.totalIncome.toLocaleString()}</p>
                         </div>
                     </div>
                 </div>
@@ -656,7 +656,7 @@ export default function ReportsManager() {
                         </div>
                         <div>
                             <h3 className="text-gray-400 text-sm font-medium">Total Expenses</h3>
-                            <p className="text-3xl font-bold text-white">${currentReport.totalExpenses.toLocaleString()}</p>
+                            <p className="text-3xl font-bold text-white">₹{currentReport.totalExpenses.toLocaleString()}</p>
                         </div>
                     </div>
                 </div>
@@ -669,7 +669,7 @@ export default function ReportsManager() {
                         <div>
                             <h3 className="text-gray-400 text-sm font-medium">Net Savings</h3>
                             <p className={`text-3xl font-bold ${currentReport.savings >= 0 ? 'text-white' : 'text-red-400'}`}>
-                                ${currentReport.savings.toLocaleString()}
+                                ₹{currentReport.savings.toLocaleString()}
                             </p>
                         </div>
                     </div>
@@ -723,7 +723,7 @@ export default function ReportsManager() {
                                     </div>
                                 </div>
                                 <p className="text-2xl font-bold text-[#F70000]">
-                                    ${category.amount.toLocaleString()}
+                                    ₹{category.amount.toLocaleString()}
                                 </p>
                                 <p className="text-gray-400 text-sm">
                                     {((category.amount / currentReport.totalExpenses) * 100).toFixed(1)}% of total expenses
@@ -769,7 +769,7 @@ export default function ReportsManager() {
                     <div className="bg-[#232326] rounded-xl p-4">
                         <p className="text-gray-400 text-sm">Avg Daily Expense</p>
                         <p className="text-2xl font-bold text-[#F70000]">
-                            ${(currentReport.totalExpenses / 30).toFixed(0)}
+                            ₹{(currentReport.totalExpenses / 30).toFixed(0)}
                         </p>
                     </div>
                 </div>
