@@ -14,7 +14,7 @@ export default function Header({ onMenuClick, onProfileClick, user, avatarRef }:
             </button>
             <button ref={avatarRef} onClick={onProfileClick} className="flex items-center gap-2 focus:outline-none ml-auto">
                 <img src={user.photoURL || "/favicon.ico"} alt="avatar" className="rounded-full w-10 h-10 border-2 border-[var(--primary)]" />
-                <span className="text-gray-200 font-medium hidden sm:inline">{user.displayName || user.email}</span>
+                <span className="text-gray-200 font-medium hidden sm:inline">{user.name || user.email}</span>
             </button>
         </header>
     );
