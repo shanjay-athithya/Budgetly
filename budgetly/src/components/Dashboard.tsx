@@ -50,6 +50,12 @@ export default function Dashboard() {
     const { user, currentMonth, incomes, expenses, emis, loading, error } = state;
     const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'error' | 'info' | 'warning' }[]>([]);
     const [showAlerts, setShowAlerts] = useState(true);
+    const [forceUpdate, setForceUpdate] = useState(0);
+
+    // Force re-render when user savings changes
+    useEffect(() => {
+        setForceUpdate(prev => prev + 1);
+    }, [user?.savings]);
 
     // Calculate financial metrics for selected month
     const calculateMetrics = useCallback(() => {
@@ -63,11 +69,22 @@ export default function Dashboard() {
         const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
         const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
         const totalEMIs = utils.calculateTotalEMIBurden(monthData.expenses);
-        const currentSavings = totalIncome - totalExpenses;
+        // Calculate current month savings
+        const currentMonthSavings = totalIncome - totalExpenses;
+        // Calculate total accumulated savings including initial savings
+        const initialSavings = user.savings || 0;
+        const allMonths = Object.keys(user.months || {}).sort();
+        const accumulatedSavings = allMonths.reduce((total, month) => {
+            const monthData = user.months[month];
+            const monthIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
+            const monthExpenses = utils.calculateTotalExpenses(monthData.expenses);
+            return total + (monthIncome - monthExpenses);
+        }, 0);
+        const currentSavings = accumulatedSavings + initialSavings;
         const expenseRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
         const emiRatio = totalIncome > 0 ? (totalEMIs / totalIncome) * 100 : 0;
         return { totalIncome, totalExpenses, currentSavings, totalEMIs, expenseRatio, emiRatio };
-    }, [user, currentMonth]);
+    }, [user, currentMonth, forceUpdate]);
 
     // Get available months for dropdown
     const getAvailableMonths = () => {
@@ -336,7 +353,7 @@ export default function Dashboard() {
                 <div className="bg-[#232326] rounded-xl p-6 border border-gray-600">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-gray-400 text-sm">Current Savings</p>
+                            <p className="text-gray-400 text-sm">Total Savings</p>
                             <p className={`text-2xl font-bold ${metrics.currentSavings >= 0 ? 'text-blue-400' : 'text-[#F70000]'}`}>
                                 ₹{metrics.currentSavings.toLocaleString()}
                             </p>

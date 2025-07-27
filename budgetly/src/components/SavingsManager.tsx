@@ -84,8 +84,10 @@ export default function SavingsManager() {
         const history = calculateSavingsHistory();
         setSavingsHistory(history);
         const totalSavings = history.reduce((sum, entry) => sum + entry.savings, 0);
-        setCurrentSavings(totalSavings);
-    }, [calculateSavingsHistory]);
+        // Add the initial savings amount from user profile
+        const initialSavings = user?.savings || 0;
+        setCurrentSavings(totalSavings + initialSavings);
+    }, [calculateSavingsHistory, user?.savings]);
 
     // Toast management
     const addToast = useCallback((message: string, type: Toast['type']) => {
