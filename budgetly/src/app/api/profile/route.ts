@@ -24,6 +24,26 @@ const UserProfileSchema = new Schema({
     location: String,
     occupation: String,
 });
+interface IncomeType {
+    amount: number;
+    date: string;
+    source?: string;
+    recurring?: boolean;
+}
+interface ExpenseType {
+    name?: string;
+    amount?: number;
+    category?: string;
+}
+interface UserProfileType {
+    uid: string;
+    name?: string;
+    incomes?: IncomeType[];
+    fixedExpenses?: ExpenseType[];
+    savings?: number;
+    location?: string;
+    occupation?: string;
+}
 const UserProfile = models.UserProfile || model('UserProfile', UserProfileSchema);
 
 export async function POST(req: NextRequest) {
@@ -34,7 +54,7 @@ export async function POST(req: NextRequest) {
     try {
         // If name is provided, update all fields (profile setup)
         // If only incomes is provided, update only incomes
-        let update: any = {};
+        let update: Partial<UserProfileType> = {};
         if (name !== undefined) {
             update = { name, fixedExpenses, savings, location, occupation, incomes };
         } else if (incomes !== undefined) {

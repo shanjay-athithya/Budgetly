@@ -15,8 +15,8 @@ export default function Login() {
             await signInWithGoogle();
             // Don't check user existence here - let the main page handle it
             // The main page will automatically detect if user is new and show savings input
-        } catch (error: any) {
-            setError(error.message || 'Failed to sign in with Google');
+        } catch (error: unknown) {
+            setError(error instanceof Error ? error.message : 'Failed to sign in with Google');
         } finally {
             setLoading(false);
         }

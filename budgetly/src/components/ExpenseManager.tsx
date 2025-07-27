@@ -13,23 +13,7 @@ import {
     FunnelIcon
 } from '@heroicons/react/24/outline';
 import { useData } from '../context/DataContext';
-import { utils } from '../services/api';
-
-interface ExpenseEntry {
-    _id?: any;
-    label: string;
-    amount: number;
-    category: string;
-    date: Date | string;
-    type: 'one-time' | 'emi';
-    note?: string;
-    emiDetails?: {
-        duration: number;
-        remainingMonths: number;
-        monthlyAmount: number;
-        startedOn: Date;
-    };
-}
+import { utils, Expense } from '../services/api';
 
 interface Toast {
     id: string;
@@ -57,7 +41,7 @@ export default function ExpenseManager() {
     const { user, currentMonth, expenses, emis, loading, error } = state;
 
     const [showModal, setShowModal] = useState(false);
-    const [editingExpense, setEditingExpense] = useState<ExpenseEntry | null>(null);
+    const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [filters, setFilters] = useState({
         month: currentMonth,
@@ -155,7 +139,7 @@ export default function ExpenseManager() {
         setShowModal(true);
     }, [resetForm]);
 
-    const openEditModal = useCallback((expense: ExpenseEntry) => {
+    const openEditModal = useCallback((expense: Expense) => {
         setEditingExpense(expense);
         setFormData({
             label: expense.label,
@@ -214,13 +198,13 @@ export default function ExpenseManager() {
             }
 
             closeModal();
-        } catch (error: any) {
-            addToast(error.message || 'Failed to save expense. Please try again.', 'error');
+        } catch (error: unknown) {
+            addToast(error instanceof Error ? error.message : 'Failed to save expense. Please try again.', 'error');
         }
     }, [user, currentMonth, formData, editingExpense, addExpense, updateExpense, addToast, closeModal]);
 
     // Handle delete
-    const handleDelete = useCallback(async (expense: ExpenseEntry) => {
+    const handleDelete = useCallback(async (expense: Expense) => {
         if (!user || !expense._id) {
             addToast('Cannot delete expense', 'error');
             return;
@@ -233,8 +217,8 @@ export default function ExpenseManager() {
         try {
             await deleteExpense(user.uid, currentMonth, expense._id);
             addToast('Expense deleted successfully!', 'success');
-        } catch (error: any) {
-            addToast(error.message || 'Failed to delete expense. Please try again.', 'error');
+        } catch (error: unknown) {
+            addToast(error instanceof Error ? error.message : 'Failed to delete expense. Please try again.', 'error');
         }
     }, [user, currentMonth, deleteExpense, addToast]);
 

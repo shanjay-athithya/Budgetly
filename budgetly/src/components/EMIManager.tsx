@@ -13,6 +13,7 @@ import {
     CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
 import { useData } from '../context/DataContext';
+import { Expense } from '../services/api';
 
 interface EMIEntry {
     id: string;
@@ -57,7 +58,7 @@ export default function EMIManager() {
             const allEMIs: EMIEntry[] = [];
 
             Object.entries(user.months).forEach(([month, monthData]) => {
-                monthData.expenses.forEach(expense => {
+                monthData.expenses.forEach((expense: Expense) => {
                     if (expense.type === 'emi' && expense.emiDetails) {
                         allEMIs.push({
                             id: expense._id || Math.random().toString(),
@@ -202,8 +203,8 @@ export default function EMIManager() {
             }
 
             closeModal();
-        } catch (error: any) {
-            addToast(error.message || 'Failed to save EMI. Please try again.', 'error');
+        } catch (error: unknown) {
+            addToast(error instanceof Error ? error.message : 'Failed to save EMI. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
@@ -229,8 +230,8 @@ export default function EMIManager() {
         try {
             await deleteExpense(user.uid, emi.month || currentMonth, emi.expenseId);
             addToast('EMI deleted successfully!', 'success');
-        } catch (error: any) {
-            addToast(error.message || 'Failed to delete EMI. Please try again.', 'error');
+        } catch (error: unknown) {
+            addToast(error instanceof Error ? error.message : 'Failed to delete EMI. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
@@ -262,8 +263,8 @@ export default function EMIManager() {
 
             await updateExpense(user.uid, emi.month || currentMonth, emi.expenseId, expenseData);
             addToast('Payment recorded successfully!', 'success');
-        } catch (error: any) {
-            addToast(error.message || 'Failed to record payment. Please try again.', 'error');
+        } catch (error: unknown) {
+            addToast(error instanceof Error ? error.message : 'Failed to record payment. Please try again.', 'error');
         }
     }, [user, currentMonth, updateExpense, addToast]);
 

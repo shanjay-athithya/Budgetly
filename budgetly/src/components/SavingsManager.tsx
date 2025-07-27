@@ -22,7 +22,7 @@ import {
     ArrowTrendingUpIcon
 } from '@heroicons/react/24/outline';
 import { useData } from '../context/DataContext';
-import { utils } from '../services/api';
+import { utils, Expense, IncomeEntry } from '../services/api';
 
 ChartJS.register(
     CategoryScale,
@@ -124,8 +124,8 @@ export default function SavingsManager() {
             await updateUser(user.uid, { savings: newAmount });
             addToast('Savings updated successfully!', 'success');
             setIsEditingSavings(false);
-        } catch (error: any) {
-            addToast(error.message || 'Failed to update savings. Please try again.', 'error');
+        } catch (error: unknown) {
+            addToast(error instanceof Error ? error.message : 'Failed to update savings. Please try again.', 'error');
         } finally {
             setLocalLoading(false);
         }

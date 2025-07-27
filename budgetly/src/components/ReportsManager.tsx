@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useData } from '../context/DataContext';
+import { Expense, IncomeEntry } from '../services/api';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
@@ -232,9 +233,9 @@ export default function ReportsManager() {
             pdf.save(fileName);
 
             addToast('PDF report downloaded successfully!', 'success');
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('PDF generation error:', error);
-            addToast('Failed to download PDF. Please try again.', 'error');
+            addToast(error instanceof Error ? error.message : 'Failed to download PDF. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
@@ -391,8 +392,8 @@ export default function ReportsManager() {
                 );
                 addToast('Report details copied to clipboard!', 'success');
             }
-        } catch (error) {
-            addToast('Failed to share report. Please try again.', 'error');
+        } catch (error: unknown) {
+            addToast(error instanceof Error ? error.message : 'Failed to share report. Please try again.', 'error');
         }
     };
 
@@ -471,7 +472,7 @@ export default function ReportsManager() {
                 borderWidth: 1,
                 cornerRadius: 8,
                 callbacks: {
-                    label: function (context: any) {
+                    label: function (context: { label: string; parsed: number }) {
                         return `${context.label}: $${context.parsed.toLocaleString()}`;
                     },
                 },
@@ -485,7 +486,7 @@ export default function ReportsManager() {
                         family: 'Lexend',
                         size: 12,
                     },
-                    callback: function (value: any) {
+                    callback: function (value: number) {
                         return '$' + value.toLocaleString();
                     },
                 },
@@ -519,7 +520,7 @@ export default function ReportsManager() {
                 borderWidth: 1,
                 cornerRadius: 8,
                 callbacks: {
-                    label: function (context: any) {
+                    label: function (context: { label: string; parsed: number; dataset: { data: number[] } }) {
                         const label = context.label || '';
                         const value = context.parsed;
                         const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);

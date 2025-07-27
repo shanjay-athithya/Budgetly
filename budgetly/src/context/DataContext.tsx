@@ -206,15 +206,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const updateUser = useCallback(async (uid: string, updateData: any) => {
+    const updateUser = useCallback(async (uid: string, updateData: Partial<User>) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
         try {
             const user = await userAPI.updateUser(uid, updateData);
             dispatch({ type: 'SET_USER', payload: user });
-        } catch (error: any) {
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+        } catch (error: unknown) {
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -226,13 +226,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
             const monthKey = month || state.currentMonth;
             const incomeData = await incomeAPI.getIncome(uid, monthKey);
             dispatch({ type: 'SET_INCOMES', payload: incomeData.income || [] });
-        } catch (error: any) {
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+        } catch (error: unknown) {
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         }
     }, [state.currentMonth]);
 
-    const addIncome = useCallback(async (uid: string, month: string, incomeEntry: any) => {
+    const addIncome = useCallback(async (uid: string, month: string, incomeEntry: Omit<IncomeEntry, '_id'>) => {
         console.log('➕ addIncome called with:', { uid, month, incomeEntry });
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
@@ -253,16 +253,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
                 dispatch({ type: 'SET_INCOMES', payload: monthData.income || [] });
                 console.log('✅ Income state updated with', monthData.income?.length, 'entries');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('❌ Error adding income:', error);
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
     }, []);
 
-    const updateIncome = useCallback(async (uid: string, month: string, incomeId: string, incomeEntry: any) => {
+    const updateIncome = useCallback(async (uid: string, month: string, incomeId: string, incomeEntry: Partial<IncomeEntry>) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
@@ -278,8 +278,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
                 const monthData = (response.user.months && response.user.months[currentMonth]) || { income: [], expenses: [] };
                 dispatch({ type: 'SET_INCOMES', payload: monthData.income || [] });
             }
-        } catch (error: any) {
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+        } catch (error: unknown) {
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -302,8 +302,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
                 const monthData = (response.user.months && response.user.months[currentMonth]) || { income: [], expenses: [] };
                 dispatch({ type: 'SET_INCOMES', payload: monthData.income || [] });
             }
-        } catch (error: any) {
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+        } catch (error: unknown) {
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -315,14 +315,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
             const monthKey = month || state.currentMonth;
             const expenses = await expensesAPI.getExpenses(uid, monthKey);
             dispatch({ type: 'SET_EXPENSES', payload: expenses });
-            dispatch({ type: 'SET_EMIS', payload: expenses.filter((exp: any) => exp.type === 'emi') });
-        } catch (error: any) {
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+            dispatch({ type: 'SET_EMIS', payload: expenses.filter((exp: Expense) => exp.type === 'emi') });
+        } catch (error: unknown) {
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         }
     }, [state.currentMonth]);
 
-    const addExpense = useCallback(async (uid: string, month: string, expense: any) => {
+    const addExpense = useCallback(async (uid: string, month: string, expense: Omit<Expense, '_id'>) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
@@ -337,17 +337,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
                 const currentMonth = utils.getCurrentMonth();
                 const monthData = (response.user.months && response.user.months[currentMonth]) || { income: [], expenses: [] };
                 dispatch({ type: 'SET_EXPENSES', payload: monthData.expenses || [] });
-                dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: any) => exp.type === 'emi') });
+                dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: Expense) => exp.type === 'emi') });
             }
-        } catch (error: any) {
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+        } catch (error: unknown) {
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
     }, []);
 
-    const updateExpense = useCallback(async (uid: string, month: string, expenseId: string, expense: any) => {
+    const updateExpense = useCallback(async (uid: string, month: string, expenseId: string, expense: Partial<Expense>) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
@@ -362,10 +362,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
                 const currentMonth = utils.getCurrentMonth();
                 const monthData = (response.user.months && response.user.months[currentMonth]) || { income: [], expenses: [] };
                 dispatch({ type: 'SET_EXPENSES', payload: monthData.expenses || [] });
-                dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: any) => exp.type === 'emi') });
+                dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: Expense) => exp.type === 'emi') });
             }
-        } catch (error: any) {
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+        } catch (error: unknown) {
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -387,10 +387,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
                 const currentMonth = utils.getCurrentMonth();
                 const monthData = (response.user.months && response.user.months[currentMonth]) || { income: [], expenses: [] };
                 dispatch({ type: 'SET_EXPENSES', payload: monthData.expenses || [] });
-                dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: any) => exp.type === 'emi') });
+                dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: Expense) => exp.type === 'emi') });
             }
-        } catch (error: any) {
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+        } catch (error: unknown) {
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -401,21 +401,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
         try {
             const suggestions = await suggestionsAPI.getSuggestions(uid, limit);
             dispatch({ type: 'SET_SUGGESTIONS', payload: suggestions });
-        } catch (error: any) {
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+        } catch (error: unknown) {
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         }
     }, []);
 
-    const createSuggestion = useCallback(async (suggestionData: any) => {
+    const createSuggestion = useCallback(async (suggestionData: Omit<ProductSuggestion, '_id' | 'suggestedAt'>) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
         try {
             const suggestion = await suggestionsAPI.createSuggestion(suggestionData);
             dispatch({ type: 'ADD_SUGGESTION', payload: suggestion });
-        } catch (error: any) {
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+        } catch (error: unknown) {
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -429,8 +429,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         try {
             await suggestionsAPI.deleteSuggestion(uid, suggestionId);
             dispatch({ type: 'DELETE_SUGGESTION', payload: suggestionId });
-        } catch (error: any) {
-            dispatch({ type: 'SET_ERROR', payload: error.message });
+        } catch (error: unknown) {
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });

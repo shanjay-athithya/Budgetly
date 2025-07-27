@@ -11,15 +11,7 @@ import {
     FunnelIcon
 } from '@heroicons/react/24/outline';
 import { useData } from '../context/DataContext';
-import { utils } from '../services/api';
-
-interface IncomeEntry {
-    _id?: any;
-    label: string;
-    amount: number;
-    source: string;
-    date: Date | string;
-}
+import { utils, IncomeEntry } from '../services/api';
 
 interface Toast {
     id: string;
@@ -192,8 +184,8 @@ export default function IncomeManager() {
             }
 
             closeModal();
-        } catch (error: any) {
-            addToast(error.message || 'Failed to save income', 'error');
+        } catch (error: unknown) {
+            addToast(error instanceof Error ? error.message : 'Failed to save income', 'error');
         }
     }, [user, formData, editingIncome, addIncome, updateIncome, addToast, closeModal]);
 
@@ -206,8 +198,8 @@ export default function IncomeManager() {
         try {
             await deleteIncome(user.uid, getDateString(income.date), income._id || '');
             addToast('Income deleted successfully', 'success');
-        } catch (error: any) {
-            addToast(error.message || 'Failed to delete income', 'error');
+        } catch (error: unknown) {
+            addToast(error instanceof Error ? error.message : 'Failed to delete income', 'error');
         }
     }, [user, deleteIncome, addToast, getDateString]);
 

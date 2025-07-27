@@ -38,9 +38,9 @@ export default function WelcomeMessage({ onComplete }: WelcomeMessageProps) {
             });
             console.log('User created successfully, calling onComplete');
             onComplete();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to create user:', error);
-            setError(error.message || 'Failed to create user');
+            setError(error instanceof Error ? error.message : 'Failed to create user');
         } finally {
             setLoading(false);
         }
@@ -63,9 +63,9 @@ export default function WelcomeMessage({ onComplete }: WelcomeMessageProps) {
             });
             console.log('User created successfully (skip), calling onComplete');
             onComplete();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to create user (skip):', error);
-            setError(error.message || 'Failed to create user');
+            setError(error instanceof Error ? error.message : 'Failed to create user');
         } finally {
             setLoading(false);
         }

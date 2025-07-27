@@ -30,7 +30,7 @@ import {
     TagIcon
 } from '@heroicons/react/24/outline';
 import { useData } from '../context/DataContext';
-import { utils } from '../services/api';
+import { utils, Expense, IncomeEntry } from '../services/api';
 
 ChartJS.register(
     CategoryScale,
@@ -48,7 +48,7 @@ ChartJS.register(
 export default function Dashboard() {
     const { state, setCurrentMonth } = useData();
     const { user, currentMonth, incomes, expenses, emis, loading, error } = state;
-    const [toasts, setToasts] = useState<any[]>([]);
+    const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'error' | 'info' | 'warning' }[]>([]);
     const [showAlerts, setShowAlerts] = useState(true);
 
     // Calculate financial metrics for selected month
@@ -103,8 +103,8 @@ export default function Dashboard() {
         const monthData = user.months && user.months[currentMonth];
         if (!monthData) return [];
 
-        const categoryMap = new Map();
-        monthData.expenses.forEach((expense: any) => {
+        const categoryMap = new Map<string, number>();
+        monthData.expenses.forEach((expense: Expense) => {
             const category = expense.category;
             const amount = expense.amount;
             categoryMap.set(category, (categoryMap.get(category) || 0) + amount);

@@ -38,21 +38,23 @@ export default function Home() {
         await loadUser(authUser.uid);
         console.log('✅ User loaded successfully, setting isNewUser to false');
         setIsNewUser(false);
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Check if this is a "user not found" error (404) vs a connection error
-        if (error.message && error.message.includes('User not found')) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage && errorMessage.includes('User not found')) {
           // This is expected for new users
           console.log('👤 User not found, setting isNewUser to true');
           setIsNewUser(true);
         } else {
           // This is a real connection error
           console.error('❌ Connection error:', error);
-          setConnectionError(error.message || 'Failed to connect to database');
+          setConnectionError(errorMessage || 'Failed to connect to database');
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Failed to initialize user:', error);
-      setConnectionError(error.message || 'Failed to initialize user');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setConnectionError(errorMessage || 'Failed to initialize user');
     } finally {
       console.log('🏁 Setting initialized to true');
       setIsInitialized(true);

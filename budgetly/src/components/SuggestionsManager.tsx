@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useData } from '../context/DataContext';
+import { ProductSuggestion } from '../services/api';
 import {
     LightBulbIcon,
     CalculatorIcon,

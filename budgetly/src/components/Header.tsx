@@ -1,9 +1,10 @@
 import React from 'react';
+import { User } from '../services/api';
 
 export default function Header({ onMenuClick, onProfileClick, user, avatarRef }: {
     onMenuClick: () => void,
     onProfileClick: () => void,
-    user: any,
+    user: User,
     avatarRef: React.RefObject<HTMLButtonElement>
 }) {
     return (
