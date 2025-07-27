@@ -81,7 +81,7 @@ export default function WelcomeMessage({ onComplete }: WelcomeMessageProps) {
                         </svg>
                     </div>
                     <h1 className="text-2xl font-bold text-white mb-2">Welcome to Budgetly!</h1>
-                    <p className="text-gray-400">Let's set up your financial profile</p>
+                    <p className="text-gray-400">Let&apos;s set up your financial profile</p>
                 </div>
 
                 <div className="mb-6">
