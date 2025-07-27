@@ -70,30 +70,30 @@ export async function POST(request: NextRequest) {
         // Direct MongoDB update approach
         const currentMonths = user.months || {};
         const currentMonthData = currentMonths[month] || { income: [], expenses: [] };
-        
+
         // Ensure income is an array
         if (!Array.isArray(currentMonthData.income)) {
             currentMonthData.income = [];
         }
-        
+
         // Add new income entry with _id
         const newIncomeEntry = {
             ...incomeEntry,
             _id: new Date().getTime().toString() // Simple ID generation
         };
-        
+
         currentMonthData.income.push(newIncomeEntry);
         currentMonths[month] = currentMonthData;
-        
+
         console.log('💾 About to update user with months:', JSON.stringify(currentMonths, null, 2));
-        
+
         // Use findOneAndUpdate directly
         const updatedUser = await User.findOneAndUpdate(
             { _id: user._id },
             { $set: { months: currentMonths } },
             { new: true, runValidators: false }
         );
-        
+
         console.log('✅ User updated successfully. Updated months:', JSON.stringify(updatedUser.months, null, 2));
         console.log('✅ Income added successfully');
 
@@ -121,19 +121,39 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        // Update specific income entry
-        const monthData = user.getMonthData(month);
-        const incomeIndex = monthData.income.findIndex((item: any) => item._id === incomeId);
+        // Direct MongoDB update approach for editing
+        const currentMonths = user.months || {};
+        const currentMonthData = currentMonths[month] || { income: [], expenses: [] };
+        
+        console.log('🔍 Looking for income with ID:', incomeId);
+        console.log('🔍 Available income entries:', currentMonthData.income.map((item: any) => ({ id: item._id, label: item.label })));
+        
+        // Convert string ID to ObjectId for comparison if needed
+        const incomeIndex = currentMonthData.income.findIndex((item: any) => {
+            const itemId = item._id?.toString();
+            const searchId = incomeId?.toString();
+            return itemId === searchId;
+        });
 
         if (incomeIndex === -1) {
+            console.log('❌ Income entry not found with ID:', incomeId);
             return NextResponse.json({ error: 'Income entry not found' }, { status: 404 });
         }
 
-        monthData.income[incomeIndex] = { ...monthData.income[incomeIndex], ...incomeEntry };
-        user.months[month] = monthData;
-        await user.save({ validateBeforeSave: false });
+        currentMonthData.income[incomeIndex] = {
+            ...currentMonthData.income[incomeIndex],
+            ...incomeEntry,
+            _id: incomeId // Keep the same ID
+        };
+        currentMonths[month] = currentMonthData;
 
-        return NextResponse.json({ success: true, user });
+        const updatedUser = await User.findOneAndUpdate(
+            { _id: user._id },
+            { $set: { months: currentMonths } },
+            { new: true, runValidators: false }
+        );
+
+        return NextResponse.json({ success: true, user: updatedUser });
     } catch (error) {
         console.error('Error updating income:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -157,13 +177,23 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        // Delete specific income entry
-        const monthData = user.getMonthData(month);
-        monthData.income = monthData.income.filter((item: any) => item._id !== incomeId);
-        user.months[month] = monthData;
-        await user.save({ validateBeforeSave: false });
+        // Direct MongoDB update approach for deleting
+        const currentMonths = user.months || {};
+        const currentMonthData = currentMonths[month] || { income: [], expenses: [] };
+        currentMonthData.income = currentMonthData.income.filter((item: any) => {
+            const itemId = item._id?.toString();
+            const searchId = incomeId?.toString();
+            return itemId !== searchId;
+        });
+        currentMonths[month] = currentMonthData;
 
-        return NextResponse.json({ success: true, user });
+        const updatedUser = await User.findOneAndUpdate(
+            { _id: user._id },
+            { $set: { months: currentMonths } },
+            { new: true, runValidators: false }
+        );
+
+        return NextResponse.json({ success: true, user: updatedUser });
     } catch (error) {
         console.error('Error deleting income:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

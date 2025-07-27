@@ -125,7 +125,11 @@ export async function PUT(request: NextRequest) {
 
         const currentMonths = user.months || {};
         const currentMonthData = currentMonths[month] || { income: [], expenses: [] };
-        const expenseIndex = currentMonthData.expenses.findIndex((e: any) => e._id === expenseId);
+        const expenseIndex = currentMonthData.expenses.findIndex((e: any) => {
+            const itemId = e._id?.toString();
+            const searchId = expenseId?.toString();
+            return itemId === searchId;
+        });
 
         if (expenseIndex === -1) {
             return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
@@ -156,10 +160,8 @@ export async function DELETE(request: NextRequest) {
     try {
         await dbConnect();
 
-        const { searchParams } = new URL(request.url);
-        const uid = searchParams.get('uid');
-        const month = searchParams.get('month');
-        const expenseId = searchParams.get('expenseId');
+        const body = await request.json();
+        const { uid, month, expenseId } = body;
 
         if (!uid || !month || !expenseId) {
             return NextResponse.json({ error: 'UID, month, and expenseId are required' }, { status: 400 });
@@ -173,10 +175,19 @@ export async function DELETE(request: NextRequest) {
 
         const currentMonths = user.months || {};
         const currentMonthData = currentMonths[month] || { income: [], expenses: [] };
-        const expenseIndex = currentMonthData.expenses.findIndex((e: any) => e._id === expenseId);
+
+        console.log('🔍 Looking for expense with ID:', expenseId);
+        console.log('🔍 Available expense entries:', currentMonthData.expenses.map((e: any) => ({ id: e._id, label: e.label })));
+
+        const expenseIndex = currentMonthData.expenses.findIndex((e: any) => {
+            const itemId = e._id?.toString();
+            const searchId = expenseId?.toString();
+            return itemId === searchId;
+        });
 
         if (expenseIndex === -1) {
-            return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
+            console.log('❌ Expense not found with ID:', expenseId);
+            return NextResponse.json({ error: 'Expense not found' }, { status: 400 });
         }
 
         currentMonthData.expenses.splice(expenseIndex, 1);
