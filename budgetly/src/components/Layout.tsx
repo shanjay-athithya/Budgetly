@@ -8,6 +8,7 @@ import ExpenseManager from './ExpenseManager';
 import SavingsManager from './SavingsManager';
 import EMIManager from './EMIManager';
 import ReportsManager from './ReportsManager';
+import SuggestionsManager from './SuggestionsManager';
 import { Bars3Icon } from '@heroicons/react/24/outline';
 
 interface LayoutProps {
@@ -63,12 +64,7 @@ export default function Layout({ children }: LayoutProps) {
             case 'emis':
                 return <EMIManager />;
             case 'suggestions':
-                return (
-                    <div className="text-center py-12">
-                        <h3 className="text-xl font-bold text-white mb-4">Financial Suggestions</h3>
-                        <p className="text-gray-400">Coming soon...</p>
-                    </div>
-                );
+                return <SuggestionsManager />;
             case 'reports':
                 return <ReportsManager />;
             default:

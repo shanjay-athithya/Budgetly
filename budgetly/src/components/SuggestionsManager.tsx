@@ -1,0 +1,627 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import {
+    LightBulbIcon,
+    CalculatorIcon,
+    CheckCircleIcon,
+    ExclamationTriangleIcon,
+    XCircleIcon,
+    ClockIcon,
+    CurrencyDollarIcon,
+    ShoppingBagIcon,
+    ArrowTrendingUpIcon
+} from '@heroicons/react/24/outline';
+
+interface SuggestionEntry {
+    id: string;
+    productName: string;
+    fullPrice: number;
+    monthlyEMI: number;
+    duration: number;
+    category: string;
+    suggestion: 'good' | 'moderate' | 'risky';
+    reason: string;
+    timestamp: Date;
+}
+
+interface SuggestionsManagerProps {
+    incomes?: any[];
+    expenses?: any[];
+    emis?: any[];
+}
+
+interface Toast {
+    id: string;
+    message: string;
+    type: 'success' | 'error' | 'info';
+}
+
+const PRODUCT_CATEGORIES = [
+    'Electronics',
+    'Lifestyle',
+    'Home & Garden',
+    'Fashion',
+    'Automotive',
+    'Health & Fitness',
+    'Entertainment',
+    'Education',
+    'Travel',
+    'Other'
+];
+
+export default function SuggestionsManager({ incomes = [], expenses = [], emis = [] }: SuggestionsManagerProps) {
+    const [suggestions, setSuggestions] = useState<SuggestionEntry[]>([]);
+    const [showForm, setShowForm] = useState(false);
+    const [currentSuggestion, setCurrentSuggestion] = useState<SuggestionEntry | null>(null);
+    const [toasts, setToasts] = useState<Toast[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    // Form state
+    const [formData, setFormData] = useState({
+        productName: '',
+        fullPrice: '',
+        monthlyEMI: '',
+        duration: '',
+        category: '',
+        inputType: 'fullPrice' as 'fullPrice' | 'emi'
+    });
+
+    // Calculate financial metrics
+    const calculateFinancialMetrics = () => {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+
+        // Calculate monthly income
+        const monthlyIncome = incomes
+            .filter(income => income.date === currentMonth)
+            .reduce((sum, income) => sum + income.amount, 0);
+
+        // Calculate monthly expenses
+        const monthlyExpenses = expenses
+            .filter(expense => expense.date.startsWith(currentMonth))
+            .reduce((sum, expense) => sum + expense.amount, 0);
+
+        // Calculate existing EMIs
+        const existingEMIs = emis
+            .filter(emi => emi.isActive)
+            .reduce((sum, emi) => sum + emi.monthlyInstallment, 0);
+
+        // Calculate savings
+        const savings = monthlyIncome - monthlyExpenses;
+
+        return {
+            monthlyIncome,
+            monthlyExpenses,
+            existingEMIs,
+            savings,
+            expenseRatio: monthlyIncome > 0 ? (monthlyExpenses / monthlyIncome) * 100 : 0
+        };
+    };
+
+    // Toast management
+    const addToast = (message: string, type: Toast['type']) => {
+        const id = Date.now().toString();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => {
+            setToasts(prev => prev.filter(toast => toast.id !== id));
+        }, 3000);
+    };
+
+    // Form handlers
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const resetForm = () => {
+        setFormData({
+            productName: '',
+            fullPrice: '',
+            monthlyEMI: '',
+            duration: '',
+            category: '',
+            inputType: 'fullPrice'
+        });
+        setCurrentSuggestion(null);
+    };
+
+    const openForm = () => {
+        resetForm();
+        setShowForm(true);
+    };
+
+    const closeForm = () => {
+        setShowForm(false);
+        resetForm();
+    };
+
+    // Calculate EMI from full price and duration
+    const calculateEMI = (price: number, months: number) => {
+        return months > 0 ? price / months : 0;
+    };
+
+    // Calculate total price from EMI and duration
+    const calculateTotalPrice = (emi: number, months: number) => {
+        return emi * months;
+    };
+
+    // Generate suggestion based on financial rules
+    const generateSuggestion = (monthlyEMI: number, fullPrice: number) => {
+        const metrics = calculateFinancialMetrics();
+        const { monthlyIncome, existingEMIs, savings, expenseRatio } = metrics;
+
+        let suggestion: 'good' | 'moderate' | 'risky' = 'good';
+        let reasons: string[] = [];
+
+        // Rule 1: Monthly EMI should be ≤ 25% of monthly income
+        if (monthlyEMI > monthlyIncome * 0.25) {
+            suggestion = 'risky';
+            reasons.push(`EMI ($${monthlyEMI.toLocaleString()}) exceeds 25% of monthly income`);
+        }
+
+        // Rule 2: Total EMIs (existing + new) should be ≤ 40% of monthly income
+        const totalEMIs = existingEMIs + monthlyEMI;
+        if (totalEMIs > monthlyIncome * 0.4) {
+            suggestion = 'risky';
+            reasons.push(`Total EMIs ($${totalEMIs.toLocaleString()}) exceed 40% of monthly income`);
+        }
+
+        // Rule 3: Check if expense ratio is already high
+        if (expenseRatio > 80) {
+            suggestion = suggestion === 'good' ? 'moderate' : suggestion;
+            reasons.push(`Current expense ratio is ${expenseRatio.toFixed(1)}% (high)`);
+        }
+
+        // Rule 4: Check savings buffer
+        const remainingSavings = savings - fullPrice;
+        if (remainingSavings < monthlyIncome * 0.1) {
+            suggestion = suggestion === 'good' ? 'moderate' : suggestion;
+            reasons.push(`Remaining savings ($${remainingSavings.toLocaleString()}) below 10% of income`);
+        }
+
+        // Determine final suggestion
+        if (suggestion === 'good' && reasons.length === 0) {
+            reasons.push('Safe to proceed - within recommended limits');
+        } else if (suggestion === 'moderate') {
+            reasons.push('Proceed with caution - consider waiting or saving more');
+        } else if (suggestion === 'risky') {
+            reasons.push('Not recommended - exceeds financial safety thresholds');
+        }
+
+        return {
+            suggestion,
+            reason: reasons.join('. ')
+        };
+    };
+
+    // Handle form submission
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!formData.productName || (!formData.fullPrice && !formData.monthlyEMI) || !formData.duration) {
+            addToast('Please fill in all required fields', 'error');
+            return;
+        }
+
+        const duration = parseInt(formData.duration);
+        let fullPrice = 0;
+        let monthlyEMI = 0;
+
+        if (formData.inputType === 'fullPrice') {
+            fullPrice = parseFloat(formData.fullPrice);
+            monthlyEMI = calculateEMI(fullPrice, duration);
+        } else {
+            monthlyEMI = parseFloat(formData.monthlyEMI);
+            fullPrice = calculateTotalPrice(monthlyEMI, duration);
+        }
+
+        if (isNaN(fullPrice) || isNaN(monthlyEMI) || fullPrice <= 0 || monthlyEMI <= 0) {
+            addToast('Please enter valid amounts', 'error');
+            return;
+        }
+
+        const { suggestion, reason } = generateSuggestion(monthlyEMI, fullPrice);
+
+        const newSuggestion: SuggestionEntry = {
+            id: Date.now().toString(),
+            productName: formData.productName,
+            fullPrice,
+            monthlyEMI,
+            duration,
+            category: formData.category || 'Other',
+            suggestion,
+            reason,
+            timestamp: new Date()
+        };
+
+        setCurrentSuggestion(newSuggestion);
+        setSuggestions(prev => [newSuggestion, ...prev]);
+        addToast('Suggestion generated successfully!', 'success');
+    };
+
+    // Save as planned EMI
+    const saveAsPlannedEMI = (suggestion: SuggestionEntry) => {
+        // This would typically save to a planned EMIs list
+        addToast('Saved as planned EMI!', 'success');
+    };
+
+    // Get suggestion icon and color
+    const getSuggestionIcon = (suggestion: string) => {
+        switch (suggestion) {
+            case 'good':
+                return { icon: CheckCircleIcon, color: 'text-green-400', bgColor: 'bg-green-500/20' };
+            case 'moderate':
+                return { icon: ExclamationTriangleIcon, color: 'text-yellow-400', bgColor: 'bg-yellow-500/20' };
+            case 'risky':
+                return { icon: XCircleIcon, color: 'text-red-400', bgColor: 'bg-red-500/20' };
+            default:
+                return { icon: CheckCircleIcon, color: 'text-gray-400', bgColor: 'bg-gray-500/20' };
+        }
+    };
+
+    // Get suggestion label
+    const getSuggestionLabel = (suggestion: string) => {
+        switch (suggestion) {
+            case 'good':
+                return 'Good Decision';
+            case 'moderate':
+                return 'Moderate Risk';
+            case 'risky':
+                return 'Not Recommended';
+            default:
+                return 'Unknown';
+        }
+    };
+
+    const metrics = calculateFinancialMetrics();
+
+    return (
+        <div className="space-y-6">
+            {/* Toast Notifications */}
+            <div className="fixed top-4 right-4 z-50 space-y-2">
+                {toasts.map(toast => (
+                    <div
+                        key={toast.id}
+                        className={`px-4 py-3 rounded-lg shadow-lg text-white font-medium transition-all duration-300 ${toast.type === 'success' ? 'bg-green-500' :
+                                toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                            }`}
+                    >
+                        {toast.message}
+                    </div>
+                ))}
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-[#F70000]/20 rounded-xl flex items-center justify-center">
+                        <LightBulbIcon className="w-6 h-6 text-[#F70000]" />
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-white">Financial Suggestions</h2>
+                        <p className="text-gray-400">Get smart purchase recommendations</p>
+                    </div>
+                </div>
+                <button
+                    onClick={openForm}
+                    className="flex items-center space-x-2 bg-[#F70000] hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 shadow-lg"
+                >
+                    <CalculatorIcon className="w-5 h-5" />
+                    <span>Suggest a Product</span>
+                </button>
+            </div>
+
+            {/* Financial Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="bg-[#383838] rounded-xl p-4 border border-gray-600">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                            <CurrencyDollarIcon className="w-5 h-5 text-green-400" />
+                        </div>
+                        <div>
+                            <p className="text-gray-400 text-sm">Monthly Income</p>
+                            <p className="text-xl font-bold text-white">${metrics.monthlyIncome.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-[#383838] rounded-xl p-4 border border-gray-600">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+                            <CurrencyDollarIcon className="w-5 h-5 text-red-400" />
+                        </div>
+                        <div>
+                            <p className="text-gray-400 text-sm">Monthly Expenses</p>
+                            <p className="text-xl font-bold text-white">${metrics.monthlyExpenses.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-[#383838] rounded-xl p-4 border border-gray-600">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                            <ClockIcon className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <div>
+                            <p className="text-gray-400 text-sm">Existing EMIs</p>
+                            <p className="text-xl font-bold text-white">${metrics.existingEMIs.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-[#383838] rounded-xl p-4 border border-gray-600">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-[#F70000]/20 rounded-lg flex items-center justify-center">
+                            <ArrowTrendingUpIcon className="w-5 h-5 text-[#F70000]" />
+                        </div>
+                        <div>
+                            <p className="text-gray-400 text-sm">Expense Ratio</p>
+                            <p className="text-xl font-bold text-white">{metrics.expenseRatio.toFixed(1)}%</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Current Suggestion */}
+            {currentSuggestion && (
+                <div className="bg-[#383838] rounded-2xl p-6 border border-gray-600 shadow-xl">
+                    <h3 className="text-xl font-bold text-white mb-6">Latest Suggestion</h3>
+                    <div className="bg-[#232326] rounded-xl p-6">
+                        <div className="flex items-start justify-between mb-4">
+                            <div>
+                                <h4 className="text-lg font-bold text-white mb-2">{currentSuggestion.productName}</h4>
+                                <p className="text-gray-400">{currentSuggestion.category}</p>
+                            </div>
+                            {(() => {
+                                const { icon: Icon, color, bgColor } = getSuggestionIcon(currentSuggestion.suggestion);
+                                return (
+                                    <div className={`w-12 h-12 ${bgColor} rounded-lg flex items-center justify-center`}>
+                                        <Icon className={`w-6 h-6 ${color}`} />
+                                    </div>
+                                );
+                            })()}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <p className="text-gray-400 text-sm">Total Price</p>
+                                <p className="text-xl font-bold text-white">${currentSuggestion.fullPrice.toLocaleString()}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-400 text-sm">Monthly EMI</p>
+                                <p className="text-xl font-bold text-[#F70000]">${currentSuggestion.monthlyEMI.toFixed(0)}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-400 text-sm">Duration</p>
+                                <p className="text-xl font-bold text-white">{currentSuggestion.duration} months</p>
+                            </div>
+                        </div>
+
+                        <div className="mb-4">
+                            <div className="flex items-center space-x-2 mb-2">
+                                {(() => {
+                                    const { icon: Icon, color } = getSuggestionIcon(currentSuggestion.suggestion);
+                                    return <Icon className={`w-5 h-5 ${color}`} />;
+                                })()}
+                                <span className="text-white font-medium">
+                                    {getSuggestionLabel(currentSuggestion.suggestion)}
+                                </span>
+                            </div>
+                            <p className="text-gray-300">{currentSuggestion.reason}</p>
+                        </div>
+
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={() => saveAsPlannedEMI(currentSuggestion)}
+                                className="flex-1 bg-[#F70000] hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+                            >
+                                Save as Planned EMI
+                            </button>
+                            <button
+                                onClick={() => setCurrentSuggestion(null)}
+                                className="px-4 py-2 text-gray-400 hover:text-white hover:bg-[#383838] rounded-lg transition-colors duration-200"
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Recent Suggestions */}
+            {suggestions.length > 0 && (
+                <div className="bg-[#383838] rounded-2xl border border-gray-600 shadow-xl overflow-hidden">
+                    <div className="p-6 border-b border-gray-600">
+                        <h3 className="text-xl font-bold text-white">Recent Suggestions</h3>
+                    </div>
+                    <div className="divide-y divide-gray-600">
+                        {suggestions.slice(0, 5).map((suggestion) => (
+                            <div key={suggestion.id} className="p-6 hover:bg-[#232326] transition-colors">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-4">
+                                        {(() => {
+                                            const { icon: Icon, color } = getSuggestionIcon(suggestion.suggestion);
+                                            return <Icon className={`w-6 h-6 ${color}`} />;
+                                        })()}
+                                        <div>
+                                            <h4 className="text-white font-medium">{suggestion.productName}</h4>
+                                            <p className="text-gray-400 text-sm">
+                                                ${suggestion.monthlyEMI.toFixed(0)}/month • {suggestion.duration} months
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-white font-medium">
+                                            {getSuggestionLabel(suggestion.suggestion)}
+                                        </p>
+                                        <p className="text-gray-400 text-sm">
+                                            {suggestion.timestamp.toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Product Input Form Modal */}
+            {showForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                    <div className="bg-[#232326] rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-2xl font-bold text-white">Suggest a Product</h3>
+                            <button
+                                onClick={closeForm}
+                                className="p-2 text-gray-400 hover:text-white hover:bg-[#383838] rounded-lg transition-colors"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            {/* Product Name */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    Product Name *
+                                </label>
+                                <input
+                                    type="text"
+                                    name="productName"
+                                    value={formData.productName}
+                                    onChange={handleInputChange}
+                                    placeholder="e.g., iPhone 15, Gaming Laptop"
+                                    className="w-full px-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent placeholder-gray-500"
+                                    required
+                                />
+                            </div>
+
+                            {/* Input Type Toggle */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    Input Type
+                                </label>
+                                <div className="flex space-x-4">
+                                    <label className="flex items-center space-x-2">
+                                        <input
+                                            type="radio"
+                                            name="inputType"
+                                            value="fullPrice"
+                                            checked={formData.inputType === 'fullPrice'}
+                                            onChange={handleInputChange}
+                                            className="text-[#F70000] bg-[#383838] border-gray-600 focus:ring-[#F70000]"
+                                        />
+                                        <span className="text-gray-300">Full Price</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2">
+                                        <input
+                                            type="radio"
+                                            name="inputType"
+                                            value="emi"
+                                            checked={formData.inputType === 'emi'}
+                                            onChange={handleInputChange}
+                                            className="text-[#F70000] bg-[#383838] border-gray-600 focus:ring-[#F70000]"
+                                        />
+                                        <span className="text-gray-300">Monthly EMI</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Amount Field */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    {formData.inputType === 'fullPrice' ? 'Full Price' : 'Monthly EMI Amount'} *
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</span>
+                                    <input
+                                        type="number"
+                                        name={formData.inputType === 'fullPrice' ? 'fullPrice' : 'monthlyEMI'}
+                                        value={formData.inputType === 'fullPrice' ? formData.fullPrice : formData.monthlyEMI}
+                                        onChange={handleInputChange}
+                                        placeholder="0.00"
+                                        step="0.01"
+                                        min="0"
+                                        className="w-full pl-8 pr-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent placeholder-gray-500"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Duration */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    Duration (months) *
+                                </label>
+                                <input
+                                    type="number"
+                                    name="duration"
+                                    value={formData.duration}
+                                    onChange={handleInputChange}
+                                    placeholder="12"
+                                    min="1"
+                                    className="w-full px-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent placeholder-gray-500"
+                                    required
+                                />
+                            </div>
+
+                            {/* Category */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    Category (Optional)
+                                </label>
+                                <select
+                                    name="category"
+                                    value={formData.category}
+                                    onChange={handleInputChange}
+                                    className="w-full px-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent"
+                                >
+                                    <option value="">Select Category</option>
+                                    {PRODUCT_CATEGORIES.map(category => (
+                                        <option key={category} value={category}>{category}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Calculation Preview */}
+                            {formData.fullPrice && formData.duration && formData.inputType === 'fullPrice' && (
+                                <div className="bg-[#383838] rounded-lg p-4 border border-gray-600">
+                                    <p className="text-gray-400 text-sm mb-1">Calculated Monthly EMI</p>
+                                    <p className="text-2xl font-bold text-[#F70000]">
+                                        ${calculateEMI(parseFloat(formData.fullPrice), parseInt(formData.duration)).toFixed(0)}
+                                    </p>
+                                </div>
+                            )}
+
+                            {formData.monthlyEMI && formData.duration && formData.inputType === 'emi' && (
+                                <div className="bg-[#383838] rounded-lg p-4 border border-gray-600">
+                                    <p className="text-gray-400 text-sm mb-1">Total Price</p>
+                                    <p className="text-2xl font-bold text-[#F70000]">
+                                        ${calculateTotalPrice(parseFloat(formData.monthlyEMI), parseInt(formData.duration)).toLocaleString()}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Action Buttons */}
+                            <div className="flex space-x-4 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={closeForm}
+                                    className="flex-1 px-4 py-3 text-gray-300 bg-[#383838] hover:bg-gray-600 rounded-lg transition-colors duration-200"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 px-4 py-3 bg-[#F70000] hover:bg-red-700 text-white font-medium rounded-lg transition-colors duration-200"
+                                >
+                                    Get Suggestion
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+} 
