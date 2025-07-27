@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '../../../../lib/mongoose';
 import User, { IUserModel } from '../../../../models/User';
-import { Expense } from '../../services/api';
+import { Expense } from '../../../services/api';
 
 export async function GET(request: NextRequest) {
     try {
