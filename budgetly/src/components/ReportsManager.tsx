@@ -14,7 +14,8 @@ import {
     Tooltip,
     Legend,
     ArcElement,
-    TooltipItem
+    TooltipItem,
+    Tick
 } from 'chart.js';
 import { Bar, Pie } from 'react-chartjs-2';
 import {
@@ -487,8 +488,11 @@ export default function ReportsManager() {
                         family: 'Lexend',
                         size: 12,
                     },
-                    callback: function (value: number) {
-                        return '$' + value.toLocaleString();
+                    callback: function (tickValue: string | number, _index: number, _ticks: Tick[]) {
+                        if (typeof tickValue === 'number') {
+                            return '$' + tickValue.toLocaleString();
+                        }
+                        return '$' + tickValue;
                     },
                 },
                 grid: {
