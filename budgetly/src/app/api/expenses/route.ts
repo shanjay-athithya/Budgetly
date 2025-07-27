@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
             monthData.expenses.forEach(expense => {
                 allExpenses.push({
                     ...expense,
+                    _id: expense._id ? expense._id.toString() : undefined,
                     month: monthKey
                 });
             });
