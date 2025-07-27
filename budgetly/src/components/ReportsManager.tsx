@@ -1,6 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useData } from '../context/DataContext';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -32,11 +35,6 @@ ChartJS.register(
     ArcElement
 );
 
-interface ReportsManagerProps {
-    incomes?: any[];
-    expenses?: any[];
-}
-
 interface MonthlyReport {
     month: string;
     totalIncome: number;
@@ -64,85 +62,96 @@ const EXPENSE_CATEGORIES = [
     'Other'
 ];
 
-export default function ReportsManager({ incomes = [], expenses = [] }: ReportsManagerProps) {
-    const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+export default function ReportsManager() {
+    const { state } = useData();
+    const { user, currentMonth } = state;
+
+    const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+    const reportRef = useRef<HTMLDivElement>(null);
+
+    // Update selectedMonth when currentMonth changes
+    useEffect(() => {
+        setSelectedMonth(currentMonth);
+    }, [currentMonth]);
     const [monthlyReports, setMonthlyReports] = useState<{ [key: string]: MonthlyReport }>({});
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [loading, setLoading] = useState(false);
 
-    // Generate monthly reports from income and expense data
+    // Generate monthly reports from user data
+    const generateReports = useCallback(() => {
+        if (!user || !user.months) {
+            setMonthlyReports({});
+            return;
+        }
+
+        const reports: { [key: string]: MonthlyReport } = {};
+
+        // Process all months from user data
+        Object.entries(user.months).forEach(([monthKey, monthData]) => {
+            const report: MonthlyReport = {
+                month: monthKey,
+                totalIncome: 0,
+                totalExpenses: 0,
+                savings: 0,
+                categoryBreakdown: {},
+                topCategories: []
+            };
+
+            // Calculate total income for the month
+            if (monthData.income && Array.isArray(monthData.income)) {
+                report.totalIncome = monthData.income.reduce((sum, income) => sum + income.amount, 0);
+            }
+
+            // Calculate total expenses and category breakdown for the month
+            if (monthData.expenses && Array.isArray(monthData.expenses)) {
+                monthData.expenses.forEach(expense => {
+                    report.totalExpenses += expense.amount;
+
+                    // Track category breakdown
+                    if (!report.categoryBreakdown[expense.category]) {
+                        report.categoryBreakdown[expense.category] = 0;
+                    }
+                    report.categoryBreakdown[expense.category] += expense.amount;
+                });
+            }
+
+            // Calculate savings
+            report.savings = report.totalIncome - report.totalExpenses;
+
+            // Calculate top 3 categories
+            report.topCategories = Object.entries(report.categoryBreakdown)
+                .map(([category, amount]) => ({ category, amount }))
+                .sort((a, b) => b.amount - a.amount)
+                .slice(0, 3);
+
+            reports[monthKey] = report;
+        });
+
+        setMonthlyReports(reports);
+    }, [user]);
+
+    // Generate reports when user data changes
     useEffect(() => {
-        const generateReports = () => {
-            const reports: { [key: string]: MonthlyReport } = {};
-
-            // Process incomes by month
-            incomes.forEach(income => {
-                const month = income.date;
-                if (!reports[month]) {
-                    reports[month] = {
-                        month,
-                        totalIncome: 0,
-                        totalExpenses: 0,
-                        savings: 0,
-                        categoryBreakdown: {},
-                        topCategories: []
-                    };
-                }
-                reports[month].totalIncome += income.amount;
-            });
-
-            // Process expenses by month
-            expenses.forEach(expense => {
-                const month = expense.date.slice(0, 7); // Get YYYY-MM from date
-                if (!reports[month]) {
-                    reports[month] = {
-                        month,
-                        totalIncome: 0,
-                        totalExpenses: 0,
-                        savings: 0,
-                        categoryBreakdown: {},
-                        topCategories: []
-                    };
-                }
-                reports[month].totalExpenses += expense.amount;
-
-                // Track category breakdown
-                if (!reports[month].categoryBreakdown[expense.category]) {
-                    reports[month].categoryBreakdown[expense.category] = 0;
-                }
-                reports[month].categoryBreakdown[expense.category] += expense.amount;
-            });
-
-            // Calculate savings and top categories for each month
-            Object.keys(reports).forEach(month => {
-                const report = reports[month];
-                report.savings = report.totalIncome - report.totalExpenses;
-
-                // Calculate top 3 categories
-                report.topCategories = Object.entries(report.categoryBreakdown)
-                    .map(([category, amount]) => ({ category, amount }))
-                    .sort((a, b) => b.amount - a.amount)
-                    .slice(0, 3);
-            });
-
-            setMonthlyReports(reports);
-        };
-
         generateReports();
-    }, [incomes, expenses]);
+    }, [generateReports]);
 
     // Get current month's report
-    const currentReport = monthlyReports[selectedMonth] || {
-        month: selectedMonth,
-        totalIncome: 0,
-        totalExpenses: 0,
-        savings: 0,
-        categoryBreakdown: {},
-        topCategories: []
-    };
+    const currentReport = useMemo(() => {
+        return monthlyReports[selectedMonth] || {
+            month: selectedMonth,
+            totalIncome: 0,
+            totalExpenses: 0,
+            savings: 0,
+            categoryBreakdown: {},
+            topCategories: []
+        };
+    }, [monthlyReports, selectedMonth]);
 
     // Get available months for dropdown
-    const availableMonths = Object.keys(monthlyReports).sort().reverse();
+    const availableMonths = useMemo(() => {
+        if (!user || !user.months) return [];
+        return Object.keys(user.months).sort().reverse();
+    }, [user]);
 
     // Toast management
     const addToast = (message: string, type: Toast['type']) => {
@@ -155,16 +164,211 @@ export default function ReportsManager({ incomes = [], expenses = [] }: ReportsM
 
     // Download PDF functionality
     const downloadPDF = async () => {
+        if (!reportRef.current) {
+            addToast('Report content not found', 'error');
+            return;
+        }
+
         setLoading(true);
         try {
-            // Simulate PDF generation
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Create a temporary container for PDF content
+            const tempContainer = document.createElement('div');
+            tempContainer.style.position = 'absolute';
+            tempContainer.style.left = '-9999px';
+            tempContainer.style.top = '0';
+            tempContainer.style.width = '800px';
+            tempContainer.style.backgroundColor = '#1C1C1E';
+            tempContainer.style.color = '#FFFFFF';
+            tempContainer.style.fontFamily = 'Lexend, sans-serif';
+            tempContainer.style.padding = '40px';
+            tempContainer.style.borderRadius = '12px';
+            document.body.appendChild(tempContainer);
+
+            // Generate PDF content
+            const pdfContent = generatePDFContent();
+            tempContainer.innerHTML = pdfContent;
+
+            // Wait for content to render
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Convert to canvas
+            const canvas = await html2canvas(tempContainer, {
+                backgroundColor: '#1C1C1E',
+                scale: 2,
+                width: 800,
+                height: tempContainer.scrollHeight,
+                useCORS: true,
+                allowTaint: true,
+                logging: false
+            });
+
+            // Remove temporary container
+            document.body.removeChild(tempContainer);
+
+            // Create PDF
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = pdfWidth - 20;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            // Add multiple pages if content is too long
+            let heightLeft = imgHeight;
+            let position = 10;
+
+            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+            heightLeft -= (pdfHeight - 20);
+
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight + 10;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                heightLeft -= (pdfHeight - 20);
+            }
+
+            // Download PDF
+            const fileName = `financial-report-${selectedMonth}-${new Date().toISOString().slice(0, 10)}.pdf`;
+            pdf.save(fileName);
+
             addToast('PDF report downloaded successfully!', 'success');
         } catch (error) {
+            console.error('PDF generation error:', error);
             addToast('Failed to download PDF. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
+    };
+
+    // Generate PDF content HTML
+    const generatePDFContent = () => {
+        const monthName = formatDate(selectedMonth);
+        const totalIncome = currentReport.totalIncome;
+        const totalExpenses = currentReport.totalExpenses;
+        const savings = currentReport.savings;
+        const topCategories = currentReport.topCategories;
+
+        return `
+            <div style="font-family: 'Lexend', sans-serif; color: #FFFFFF; background: #1C1C1E; padding: 40px; border-radius: 12px;">
+                <!-- Header -->
+                <div style="text-align: center; margin-bottom: 40px; border-bottom: 2px solid #F70000; padding-bottom: 20px;">
+                    <h1 style="color: #F70000; font-size: 32px; margin: 0; font-weight: bold;">Financial Report</h1>
+                    <p style="color: #A0A0A0; font-size: 18px; margin: 10px 0 0 0;">${monthName}</p>
+                    <p style="color: #A0A0A0; font-size: 14px; margin: 5px 0 0 0;">Generated on ${new Date().toLocaleDateString()}</p>
+                </div>
+
+                <!-- User Information -->
+                <div style="background: #232326; padding: 20px; border-radius: 12px; border: 1px solid #383838; margin-bottom: 30px;">
+                    <h2 style="color: #FFFFFF; font-size: 20px; margin: 0 0 15px 0; border-bottom: 1px solid #383838; padding-bottom: 10px;">Report Owner</h2>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <span style="color: #A0A0A0; font-size: 14px;">Name:</span>
+                            <p style="color: #FFFFFF; font-size: 16px; margin: 5px 0 0 0; font-weight: bold;">${user?.name || 'Not specified'}</p>
+                        </div>
+                        <div>
+                            <span style="color: #A0A0A0; font-size: 14px;">Email:</span>
+                            <p style="color: #FFFFFF; font-size: 16px; margin: 5px 0 0 0;">${user?.email || 'Not specified'}</p>
+                        </div>
+                        ${user?.occupation ? `
+                        <div>
+                            <span style="color: #A0A0A0; font-size: 14px;">Occupation:</span>
+                            <p style="color: #FFFFFF; font-size: 16px; margin: 5px 0 0 0;">${user.occupation}</p>
+                        </div>
+                        ` : ''}
+                        ${user?.location ? `
+                        <div>
+                            <span style="color: #A0A0A0; font-size: 14px;">Location:</span>
+                            <p style="color: #FFFFFF; font-size: 16px; margin: 5px 0 0 0;">${user.location}</p>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <!-- Summary Cards -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 40px;">
+                    <div style="background: #232326; padding: 20px; border-radius: 12px; border: 1px solid #383838; text-align: center;">
+                        <h3 style="color: #10B981; font-size: 24px; margin: 0 0 10px 0;">₹${totalIncome.toLocaleString()}</h3>
+                        <p style="color: #A0A0A0; font-size: 14px; margin: 0;">Total Income</p>
+                    </div>
+                    <div style="background: #232326; padding: 20px; border-radius: 12px; border: 1px solid #383838; text-align: center;">
+                        <h3 style="color: #EF4444; font-size: 24px; margin: 0 0 10px 0;">₹${totalExpenses.toLocaleString()}</h3>
+                        <p style="color: #A0A0A0; font-size: 14px; margin: 0;">Total Expenses</p>
+                    </div>
+                    <div style="background: #232326; padding: 20px; border-radius: 12px; border: 1px solid #383838; text-align: center;">
+                        <h3 style="color: #F70000; font-size: 24px; margin: 0 0 10px 0;">₹${savings.toLocaleString()}</h3>
+                        <p style="color: #A0A0A0; font-size: 14px; margin: 0;">Net Savings</p>
+                    </div>
+                </div>
+
+                <!-- Category Breakdown -->
+                <div style="margin-bottom: 40px;">
+                    <h2 style="color: #FFFFFF; font-size: 24px; margin: 0 0 20px 0; border-bottom: 1px solid #383838; padding-bottom: 10px;">Top Spending Categories</h2>
+                    <div style="background: #232326; padding: 20px; border-radius: 12px; border: 1px solid #383838;">
+                        ${topCategories.length > 0 ? topCategories.map((category, index) => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: ${index < topCategories.length - 1 ? '1px solid #383838' : 'none'};">
+                                <div style="display: flex; align-items: center;">
+                                    <div style="width: 12px; height: 12px; border-radius: 50%; background: ${['#F70000', '#3B82F6', '#10B981'][index] || '#8B5CF6'}; margin-right: 12px;"></div>
+                                    <span style="color: #FFFFFF; font-size: 16px;">${category.category}</span>
+                                </div>
+                                <span style="color: #F70000; font-size: 16px; font-weight: bold;">₹${category.amount.toLocaleString()}</span>
+                            </div>
+                        `).join('') : '<p style="color: #A0A0A0; text-align: center; margin: 20px 0;">No expense data available</p>'}
+                    </div>
+                </div>
+
+                <!-- Simple Chart Representation -->
+                <div style="margin-bottom: 40px;">
+                    <h2 style="color: #FFFFFF; font-size: 24px; margin: 0 0 20px 0; border-bottom: 1px solid #383838; padding-bottom: 10px;">Income vs Expenses Overview</h2>
+                    <div style="background: #232326; padding: 20px; border-radius: 12px; border: 1px solid #383838;">
+                        <div style="display: flex; align-items: end; justify-content: space-around; height: 200px; margin: 20px 0;">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <div style="width: 60px; background: #10B981; border-radius: 8px 8px 0 0; margin-bottom: 10px; height: ${(() => {
+                const maxValue = Math.max(totalIncome, totalExpenses, Math.abs(savings));
+                return maxValue > 0 ? Math.max(20, (totalIncome / maxValue) * 150) : 20;
+            })()}px;"></div>
+                                <span style="color: #10B981; font-size: 16px; font-weight: bold;">₹${totalIncome.toLocaleString()}</span>
+                                <span style="color: #A0A0A0; font-size: 12px;">Income</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <div style="width: 60px; background: #EF4444; border-radius: 8px 8px 0 0; margin-bottom: 10px; height: ${(() => {
+                const maxValue = Math.max(totalIncome, totalExpenses, Math.abs(savings));
+                return maxValue > 0 ? Math.max(20, (totalExpenses / maxValue) * 150) : 20;
+            })()}px;"></div>
+                                <span style="color: #EF4444; font-size: 16px; font-weight: bold;">₹${totalExpenses.toLocaleString()}</span>
+                                <span style="color: #A0A0A0; font-size: 12px;">Expenses</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <div style="width: 60px; background: #F70000; border-radius: 8px 8px 0 0; margin-bottom: 10px; height: ${(() => {
+                const maxValue = Math.max(totalIncome, totalExpenses, Math.abs(savings));
+                return maxValue > 0 ? Math.max(20, (Math.abs(savings) / maxValue) * 150) : 20;
+            })()}px;"></div>
+                                <span style="color: #F70000; font-size: 16px; font-weight: bold;">₹${savings.toLocaleString()}</span>
+                                <span style="color: #A0A0A0; font-size: 12px;">Savings</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Breakdown -->
+                <div style="margin-bottom: 40px;">
+                    <h2 style="color: #FFFFFF; font-size: 24px; margin: 0 0 20px 0; border-bottom: 1px solid #383838; padding-bottom: 10px;">Category Breakdown</h2>
+                    <div style="background: #232326; padding: 20px; border-radius: 12px; border: 1px solid #383838;">
+                        ${Object.entries(currentReport.categoryBreakdown).length > 0 ? Object.entries(currentReport.categoryBreakdown).map(([category, amount], index) => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: ${index < Object.entries(currentReport.categoryBreakdown).length - 1 ? '1px solid #383838' : 'none'};">
+                                <span style="color: #A0A0A0; font-size: 14px;">${category}</span>
+                                <span style="color: #FFFFFF; font-size: 14px; font-weight: bold;">₹${amount.toLocaleString()}</span>
+                            </div>
+                        `).join('') : '<p style="color: #A0A0A0; text-align: center; margin: 20px 0;">No category data available</p>'}
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #383838;">
+                    <p style="color: #A0A0A0; font-size: 12px; margin: 0;">Generated by Budgetly - Personal Finance Tracker</p>
+                    <p style="color: #A0A0A0; font-size: 12px; margin: 5px 0 0 0;">Report period: ${monthName}</p>
+                </div>
+            </div>
+        `;
     };
 
     // Share functionality
@@ -327,15 +531,50 @@ export default function ReportsManager({ incomes = [], expenses = [] }: ReportsM
         },
     };
 
+    // Loading state
+    if (state.loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#F70000]"></div>
+            </div>
+        );
+    }
+
+    // Error state
+    if (state.error) {
+        return (
+            <div className="text-center py-8">
+                <div className="text-red-500 mb-4">
+                    <ChartBarIcon className="h-12 w-12 mx-auto" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">Error Loading Reports</h3>
+                <p className="text-gray-400">{state.error}</p>
+            </div>
+        );
+    }
+
+    // No data state
+    if (!user || !user.months || Object.keys(user.months).length === 0) {
+        return (
+            <div className="text-center py-8">
+                <div className="text-gray-500 mb-4">
+                    <ChartBarIcon className="h-12 w-12 mx-auto" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">No Data Available</h3>
+                <p className="text-gray-400">Add some income and expenses to generate reports</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-6" ref={reportRef}>
             {/* Toast Notifications */}
             <div className="fixed top-4 right-4 z-50 space-y-2">
                 {toasts.map(toast => (
                     <div
                         key={toast.id}
                         className={`px-4 py-3 rounded-lg shadow-lg text-white font-medium transition-all duration-300 ${toast.type === 'success' ? 'bg-green-500' :
-                                toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                            toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
                             }`}
                     >
                         {toast.message}
@@ -380,7 +619,11 @@ export default function ReportsManager({ incomes = [], expenses = [] }: ReportsM
                         disabled={loading}
                         className="flex items-center space-x-2 bg-[#F70000] hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <DocumentArrowDownIcon className="w-5 h-5" />
+                        {loading ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        ) : (
+                            <DocumentArrowDownIcon className="w-5 h-5" />
+                        )}
                         <span>{loading ? 'Generating...' : 'Download PDF'}</span>
                     </button>
                 </div>
@@ -466,7 +709,7 @@ export default function ReportsManager({ incomes = [], expenses = [] }: ReportsM
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center space-x-2">
                                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold ${index === 0 ? 'bg-[#F70000]' :
-                                                index === 1 ? 'bg-gray-500' : 'bg-orange-500'
+                                            index === 1 ? 'bg-gray-500' : 'bg-orange-500'
                                             }`}>
                                             {index + 1}
                                         </div>
