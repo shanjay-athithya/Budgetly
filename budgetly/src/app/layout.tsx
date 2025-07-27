@@ -18,7 +18,7 @@ export default function RootLayout({
       <body className="font-['Lexend']">
         <AuthProvider>
           <DataProvider>
-            {children}
+        {children}
           </DataProvider>
         </AuthProvider>
       </body>

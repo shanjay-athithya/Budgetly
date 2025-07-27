@@ -175,8 +175,8 @@ budgetly/
    - **MongoDB Atlas**: Use your Atlas connection string
 
 5. **Run the development server**
-   ```bash
-   npm run dev
+```bash
+npm run dev
    ```
 
 6. **Open your browser**
