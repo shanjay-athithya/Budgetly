@@ -68,7 +68,7 @@ export default function Sidebar({ open, onClose, onNavigate, currentSection }: S
                 <div className="flex items-center justify-between p-6 border-b border-gray-600">
                     <div className="flex items-center space-x-3">
                         <img
-                            src="https://ik.imagekit.io/hmx3cjrmq/logo.png?updatedAt=1753641722698"
+                            src="https://ik.imagekit.io/hmx3cjrmq/Budgetly.png?updatedAt=1753642234289"
                             alt="Budgetly Logo"
                             className="w-8 h-8 rounded-lg object-cover"
                         />
