@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useData } from '../context/DataContext';
-import { ProductSuggestion } from '../services/api';
 import {
     LightBulbIcon,
     CalculatorIcon,
@@ -11,7 +10,6 @@ import {
     XCircleIcon,
     ClockIcon,
     CurrencyDollarIcon,
-    ShoppingBagIcon,
     ArrowTrendingUpIcon
 } from '@heroicons/react/24/outline';
 
@@ -54,7 +52,6 @@ export default function SuggestionsManager() {
     const [showForm, setShowForm] = useState(false);
     const [currentSuggestion, setCurrentSuggestion] = useState<SuggestionEntry | null>(null);
     const [toasts, setToasts] = useState<Toast[]>([]);
-    const [loading, setLoading] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -174,7 +171,7 @@ export default function SuggestionsManager() {
         const { monthlyIncome, existingEMIs, savings, expenseRatio } = metrics;
 
         let suggestion: 'good' | 'moderate' | 'risky' = 'good';
-        let reasons: string[] = [];
+        const reasons: string[] = [];
 
         // Rule 1: Monthly EMI should be ≤ 25% of monthly income
         if (monthlyEMI > monthlyIncome * 0.25) {
