@@ -65,15 +65,41 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Invalid expense data' }, { status: 400 });
         }
 
-        // Convert date string to Date object
-        const expenseData = {
+        console.log('👤 User found before adding expense:', user._id);
+        console.log('📊 User months before:', JSON.stringify(user.months, null, 2));
+
+        // Direct MongoDB update approach
+        const currentMonths = user.months || {};
+        const currentMonthData = currentMonths[month] || { income: [], expenses: [] };
+
+        // Ensure expenses is an array
+        if (!Array.isArray(currentMonthData.expenses)) {
+            currentMonthData.expenses = [];
+        }
+
+        // Add new expense entry with _id
+        const newExpenseEntry = {
             ...expense,
-            date: new Date(expense.date)
+            date: new Date(expense.date),
+            _id: new Date().getTime().toString() // Simple ID generation
         };
 
-        await user.addExpense(month, expenseData);
+        currentMonthData.expenses.push(newExpenseEntry);
+        currentMonths[month] = currentMonthData;
 
-        return NextResponse.json({ success: true, user });
+        console.log('💾 About to update user with months:', JSON.stringify(currentMonths, null, 2));
+
+        // Use findOneAndUpdate directly
+        const updatedUser = await User.findOneAndUpdate(
+            { _id: user._id },
+            { $set: { months: currentMonths } },
+            { new: true, runValidators: false }
+        );
+
+        console.log('✅ User updated successfully. Updated months:', JSON.stringify(updatedUser.months, null, 2));
+        console.log('✅ Expense added successfully');
+
+        return NextResponse.json({ success: true, user: updatedUser });
     } catch (error) {
         console.error('Error adding expense:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -97,22 +123,29 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const monthData = user.getMonthData(month);
-        const expenseIndex = monthData.expenses.findIndex((e: any) => e._id.toString() === expenseId);
+        const currentMonths = user.months || {};
+        const currentMonthData = currentMonths[month] || { income: [], expenses: [] };
+        const expenseIndex = currentMonthData.expenses.findIndex((e: any) => e._id === expenseId);
 
         if (expenseIndex === -1) {
             return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
         }
 
-        monthData.expenses[expenseIndex] = {
+        currentMonthData.expenses[expenseIndex] = {
             ...expense,
-            date: new Date(expense.date)
+            date: new Date(expense.date),
+            _id: expenseId // Keep the same ID
         };
 
-        user.months[month] = monthData;
-        await user.save({ validateBeforeSave: false });
+        currentMonths[month] = currentMonthData;
 
-        return NextResponse.json({ success: true, user });
+        const updatedUser = await User.findOneAndUpdate(
+            { _id: user._id },
+            { $set: { months: currentMonths } },
+            { new: true, runValidators: false }
+        );
+
+        return NextResponse.json({ success: true, user: updatedUser });
     } catch (error) {
         console.error('Error updating expense:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -138,18 +171,24 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const monthData = user.getMonthData(month);
-        const expenseIndex = monthData.expenses.findIndex((e: any) => e._id.toString() === expenseId);
+        const currentMonths = user.months || {};
+        const currentMonthData = currentMonths[month] || { income: [], expenses: [] };
+        const expenseIndex = currentMonthData.expenses.findIndex((e: any) => e._id === expenseId);
 
         if (expenseIndex === -1) {
             return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
         }
 
-        monthData.expenses.splice(expenseIndex, 1);
-        user.months[month] = monthData;
-        await user.save({ validateBeforeSave: false });
+        currentMonthData.expenses.splice(expenseIndex, 1);
+        currentMonths[month] = currentMonthData;
 
-        return NextResponse.json({ success: true, user });
+        const updatedUser = await User.findOneAndUpdate(
+            { _id: user._id },
+            { $set: { months: currentMonths } },
+            { new: true, runValidators: false }
+        );
+
+        return NextResponse.json({ success: true, user: updatedUser });
     } catch (error) {
         console.error('Error deleting expense:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
