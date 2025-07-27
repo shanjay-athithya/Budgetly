@@ -67,9 +67,12 @@ export default function Sidebar({ open, onClose, onNavigate, currentSection }: S
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-600">
                     <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-[#F70000] rounded-lg flex items-center justify-center">
-                            <span className="text-white font-bold text-lg">B</span>
-                        </div>
+                        <img
+                            src="https://ik.imagekit.io/hmx3cjrmq/logo.png?updatedAt=1753641722698"
+                            alt="Budgetly Logo"
+                            className="w-8 h-8 rounded-lg object-cover"
+                        />
+
                         <h1 className="text-xl font-bold text-white">Budgetly</h1>
                     </div>
                     <button
@@ -90,8 +93,8 @@ export default function Sidebar({ open, onClose, onNavigate, currentSection }: S
                                 key={item.section}
                                 onClick={() => handleNavigation(item.section)}
                                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors duration-200 ${isActive
-                                        ? 'bg-[#F70000] text-white'
-                                        : 'text-gray-300 hover:bg-gray-600 hover:text-white'
+                                    ? 'bg-[#F70000] text-white'
+                                    : 'text-gray-300 hover:bg-gray-600 hover:text-white'
                                     }`}
                             >
                                 <Icon className="w-5 h-5" />
