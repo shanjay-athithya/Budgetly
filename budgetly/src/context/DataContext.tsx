@@ -26,6 +26,8 @@ type Action =
     | { type: 'SET_EMIS'; payload: any[] }
     | { type: 'SET_SUGGESTIONS'; payload: ProductSuggestion[] }
     | { type: 'ADD_INCOME'; payload: any }
+    | { type: 'UPDATE_INCOME'; payload: any }
+    | { type: 'DELETE_INCOME'; payload: string }
     | { type: 'ADD_EXPENSE'; payload: any }
     | { type: 'UPDATE_EXPENSE'; payload: any }
     | { type: 'DELETE_EXPENSE'; payload: string }
@@ -74,6 +76,20 @@ function appReducer(state: AppState, action: Action): AppState {
         case 'ADD_INCOME':
             return { ...state, incomes: [...state.incomes, action.payload] };
 
+        case 'UPDATE_INCOME':
+            return {
+                ...state,
+                incomes: state.incomes.map(inc =>
+                    inc._id === action.payload._id ? action.payload : inc
+                )
+            };
+
+        case 'DELETE_INCOME':
+            return {
+                ...state,
+                incomes: state.incomes.filter(inc => inc._id !== action.payload)
+            };
+
         case 'ADD_EXPENSE':
             return { ...state, expenses: [...state.expenses, action.payload] };
 
@@ -115,8 +131,9 @@ interface DataContextType {
     updateUser: (uid: string, updateData: any) => Promise<void>;
     // Income actions
     loadIncome: (uid: string, month?: string) => Promise<void>;
-    addIncome: (uid: string, month: string, amount: number) => Promise<void>;
-    updateIncome: (uid: string, month: string, amount: number) => Promise<void>;
+    addIncome: (uid: string, month: string, incomeEntry: any) => Promise<void>;
+    updateIncome: (uid: string, month: string, incomeId: string, incomeEntry: any) => Promise<void>;
+    deleteIncome: (uid: string, month: string, incomeId: string) => Promise<void>;
     // Expense actions
     loadExpenses: (uid: string, month?: string) => Promise<void>;
     addExpense: (uid: string, month: string, expense: any) => Promise<void>;
@@ -139,21 +156,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(appReducer, initialState);
 
     const loadUser = useCallback(async (uid: string) => {
+        console.log('🔍 loadUser called for UID:', uid);
+        console.log('🔍 loadUser function is being executed!');
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
         try {
             const user = await userAPI.getUser(uid);
+            console.log('📥 User loaded from API:', user._id);
+            console.log('📊 User months data:', JSON.stringify(user.months, null, 2));
             dispatch({ type: 'SET_USER', payload: user });
 
             // Load current month data
             const currentMonth = utils.getCurrentMonth();
-            const monthData = user.months[currentMonth] || { income: 0, expenses: [] };
+            console.log('📅 Current month:', currentMonth);
+            const monthData = (user.months && user.months[currentMonth]) || { income: [], expenses: [] };
+            console.log('📋 Current month data:', JSON.stringify(monthData, null, 2));
+            console.log('💰 Income array length:', monthData.income?.length);
+            console.log('💸 Expenses array length:', monthData.expenses?.length);
 
-            dispatch({ type: 'SET_INCOMES', payload: [monthData.income] });
-            dispatch({ type: 'SET_EXPENSES', payload: monthData.expenses });
-            dispatch({ type: 'SET_EMIS', payload: monthData.expenses.filter((exp: any) => exp.type === 'emi') });
+            dispatch({ type: 'SET_INCOMES', payload: monthData.income || [] });
+            dispatch({ type: 'SET_EXPENSES', payload: monthData.expenses || [] });
+            dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: any) => exp.type === 'emi') });
+            console.log('✅ User data loaded successfully');
         } catch (error: any) {
+            console.error('❌ Error loading user:', error);
             dispatch({ type: 'SET_ERROR', payload: error.message });
             throw error;
         } finally {
@@ -162,13 +189,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const createUser = useCallback(async (userData: any) => {
+        console.log('createUser called with data:', userData);
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
         try {
             const user = await userAPI.createUser(userData);
+            console.log('User created successfully:', user._id);
             dispatch({ type: 'SET_USER', payload: user });
         } catch (error: any) {
+            console.error('Error creating user:', error);
             dispatch({ type: 'SET_ERROR', payload: error.message });
             throw error;
         } finally {
@@ -194,30 +224,59 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const loadIncome = useCallback(async (uid: string, month?: string) => {
         try {
             const monthKey = month || state.currentMonth;
-            const income = await incomeAPI.getIncome(uid, monthKey);
-            dispatch({ type: 'SET_INCOMES', payload: [income] });
+            const incomeData = await incomeAPI.getIncome(uid, monthKey);
+            dispatch({ type: 'SET_INCOMES', payload: incomeData.income || [] });
         } catch (error: any) {
             dispatch({ type: 'SET_ERROR', payload: error.message });
             throw error;
         }
     }, [state.currentMonth]);
 
-    const addIncome = useCallback(async (uid: string, month: string, amount: number) => {
+    const addIncome = useCallback(async (uid: string, month: string, incomeEntry: any) => {
+        console.log('➕ addIncome called with:', { uid, month, incomeEntry });
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
         try {
-            const income = await incomeAPI.addIncome(uid, month, amount);
-            dispatch({ type: 'ADD_INCOME', payload: income });
+            const response = await incomeAPI.addIncome(uid, month, incomeEntry);
+            console.log('📤 API response:', JSON.stringify(response, null, 2));
 
-            // Update user state
-            if (state.user) {
-                const updatedUser = { ...state.user };
-                if (!updatedUser.months[month]) {
-                    updatedUser.months[month] = { income: 0, expenses: [] };
-                }
-                updatedUser.months[month].income = amount;
-                dispatch({ type: 'SET_USER', payload: updatedUser });
+            // Use the returned user data to update state
+            if (response && response.user) {
+                console.log('👤 Updated user data:', JSON.stringify(response.user.months, null, 2));
+                dispatch({ type: 'SET_USER', payload: response.user });
+
+                // Update the global incomes state for the current month
+                const currentMonth = utils.getCurrentMonth();
+                const monthData = (response.user.months && response.user.months[currentMonth]) || { income: [], expenses: [] };
+                console.log('📋 Updated month data:', JSON.stringify(monthData, null, 2));
+                dispatch({ type: 'SET_INCOMES', payload: monthData.income || [] });
+                console.log('✅ Income state updated with', monthData.income?.length, 'entries');
+            }
+        } catch (error: any) {
+            console.error('❌ Error adding income:', error);
+            dispatch({ type: 'SET_ERROR', payload: error.message });
+            throw error;
+        } finally {
+            dispatch({ type: 'SET_LOADING', payload: false });
+        }
+    }, []);
+
+    const updateIncome = useCallback(async (uid: string, month: string, incomeId: string, incomeEntry: any) => {
+        dispatch({ type: 'SET_LOADING', payload: true });
+        dispatch({ type: 'SET_ERROR', payload: null });
+
+        try {
+            const response = await incomeAPI.updateIncome(uid, month, incomeId, incomeEntry);
+
+            // Use the returned user data to update state
+            if (response && response.user) {
+                dispatch({ type: 'SET_USER', payload: response.user });
+
+                // Update the global incomes state for the current month
+                const currentMonth = utils.getCurrentMonth();
+                const monthData = (response.user.months && response.user.months[currentMonth]) || { income: [], expenses: [] };
+                dispatch({ type: 'SET_INCOMES', payload: monthData.income || [] });
             }
         } catch (error: any) {
             dispatch({ type: 'SET_ERROR', payload: error.message });
@@ -225,24 +284,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    }, [state.user]);
+    }, []);
 
-    const updateIncome = useCallback(async (uid: string, month: string, amount: number) => {
+    const deleteIncome = useCallback(async (uid: string, month: string, incomeId: string) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
         try {
-            const income = await incomeAPI.updateIncome(uid, month, amount);
-            dispatch({ type: 'SET_INCOMES', payload: [income] });
+            const response = await incomeAPI.deleteIncome(uid, month, incomeId);
 
-            // Update user state
-            if (state.user) {
-                const updatedUser = { ...state.user };
-                if (!updatedUser.months[month]) {
-                    updatedUser.months[month] = { income: 0, expenses: [] };
-                }
-                updatedUser.months[month].income = amount;
-                dispatch({ type: 'SET_USER', payload: updatedUser });
+            // Use the returned user data to update state
+            if (response && response.user) {
+                dispatch({ type: 'SET_USER', payload: response.user });
+
+                // Update the global incomes state for the current month
+                const currentMonth = utils.getCurrentMonth();
+                const monthData = (response.user.months && response.user.months[currentMonth]) || { income: [], expenses: [] };
+                dispatch({ type: 'SET_INCOMES', payload: monthData.income || [] });
             }
         } catch (error: any) {
             dispatch({ type: 'SET_ERROR', payload: error.message });
@@ -250,7 +308,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    }, [state.user]);
+    }, []);
 
     const loadExpenses = useCallback(async (uid: string, month?: string) => {
         try {
@@ -269,22 +327,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'SET_ERROR', payload: null });
 
         try {
-            const newExpense = await expensesAPI.addExpense(uid, month, expense);
-            dispatch({ type: 'ADD_EXPENSE', payload: newExpense });
+            const response = await expensesAPI.addExpense(uid, month, expense);
 
-            // Update EMIs if it's an EMI expense
-            if (expense.type === 'emi') {
-                dispatch({ type: 'SET_EMIS', payload: [...state.emis, newExpense] });
-            }
+            // Use the returned user data to update state
+            if (response && response.user) {
+                dispatch({ type: 'SET_USER', payload: response.user });
 
-            // Update user state
-            if (state.user) {
-                const updatedUser = { ...state.user };
-                if (!updatedUser.months[month]) {
-                    updatedUser.months[month] = { income: 0, expenses: [] };
-                }
-                updatedUser.months[month].expenses.push(newExpense);
-                dispatch({ type: 'SET_USER', payload: updatedUser });
+                // Update the global expenses state for the current month
+                const currentMonth = utils.getCurrentMonth();
+                const monthData = (response.user.months && response.user.months[currentMonth]) || { income: [], expenses: [] };
+                dispatch({ type: 'SET_EXPENSES', payload: monthData.expenses || [] });
+                dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: any) => exp.type === 'emi') });
             }
         } catch (error: any) {
             dispatch({ type: 'SET_ERROR', payload: error.message });
@@ -292,25 +345,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    }, [state.user, state.emis]);
+    }, []);
 
     const updateExpense = useCallback(async (uid: string, month: string, expenseId: string, expense: any) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
         try {
-            const updatedExpense = await expensesAPI.updateExpense(uid, month, expenseId, expense);
-            dispatch({ type: 'UPDATE_EXPENSE', payload: updatedExpense });
+            const response = await expensesAPI.updateExpense(uid, month, expenseId, expense);
 
-            // Update user state
-            if (state.user) {
-                const updatedUser = { ...state.user };
-                if (updatedUser.months[month]) {
-                    updatedUser.months[month].expenses = updatedUser.months[month].expenses.map((exp: any) =>
-                        exp._id === expenseId ? updatedExpense : exp
-                    );
-                    dispatch({ type: 'SET_USER', payload: updatedUser });
-                }
+            // Use the returned user data to update state
+            if (response && response.user) {
+                dispatch({ type: 'SET_USER', payload: response.user });
+
+                // Update the global expenses state for the current month
+                const currentMonth = utils.getCurrentMonth();
+                const monthData = (response.user.months && response.user.months[currentMonth]) || { income: [], expenses: [] };
+                dispatch({ type: 'SET_EXPENSES', payload: monthData.expenses || [] });
+                dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: any) => exp.type === 'emi') });
             }
         } catch (error: any) {
             dispatch({ type: 'SET_ERROR', payload: error.message });
@@ -318,23 +370,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    }, [state.user]);
+    }, []);
 
     const deleteExpense = useCallback(async (uid: string, month: string, expenseId: string) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
         try {
-            await expensesAPI.deleteExpense(uid, month, expenseId);
-            dispatch({ type: 'DELETE_EXPENSE', payload: expenseId });
+            const response = await expensesAPI.deleteExpense(uid, month, expenseId);
 
-            // Update user state
-            if (state.user) {
-                const updatedUser = { ...state.user };
-                if (updatedUser.months[month]) {
-                    updatedUser.months[month].expenses = updatedUser.months[month].expenses.filter((exp: any) => exp._id !== expenseId);
-                    dispatch({ type: 'SET_USER', payload: updatedUser });
-                }
+            // Use the returned user data to update state
+            if (response && response.user) {
+                dispatch({ type: 'SET_USER', payload: response.user });
+
+                // Update the global expenses state for the current month
+                const currentMonth = utils.getCurrentMonth();
+                const monthData = (response.user.months && response.user.months[currentMonth]) || { income: [], expenses: [] };
+                dispatch({ type: 'SET_EXPENSES', payload: monthData.expenses || [] });
+                dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: any) => exp.type === 'emi') });
             }
         } catch (error: any) {
             dispatch({ type: 'SET_ERROR', payload: error.message });
@@ -342,7 +395,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    }, [state.user]);
+    }, []);
 
     const loadSuggestions = useCallback(async (uid: string, limit?: number) => {
         try {
@@ -401,6 +454,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         loadIncome,
         addIncome,
         updateIncome,
+        deleteIncome,
         loadExpenses,
         addExpense,
         updateExpense,

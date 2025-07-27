@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
         // Return all expenses from all months
         const allExpenses = [];
-        for (const [monthKey, monthData] of user.months) {
+        for (const [monthKey, monthData] of Object.entries(user.months)) {
             monthData.expenses.forEach(expense => {
                 allExpenses.push({
                     ...expense.toObject(),
@@ -109,8 +109,8 @@ export async function PUT(request: NextRequest) {
             date: new Date(expense.date)
         };
 
-        user.months.set(month, monthData);
-        await user.save();
+        user.months[month] = monthData;
+        await user.save({ validateBeforeSave: false });
 
         return NextResponse.json({ success: true, user });
     } catch (error) {
@@ -146,8 +146,8 @@ export async function DELETE(request: NextRequest) {
         }
 
         monthData.expenses.splice(expenseIndex, 1);
-        user.months.set(month, monthData);
-        await user.save();
+        user.months[month] = monthData;
+        await user.save({ validateBeforeSave: false });
 
         return NextResponse.json({ success: true, user });
     } catch (error) {

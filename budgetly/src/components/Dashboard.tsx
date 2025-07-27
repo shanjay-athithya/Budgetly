@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -52,34 +52,22 @@ export default function Dashboard() {
     const [showAlerts, setShowAlerts] = useState(true);
 
     // Calculate financial metrics for selected month
-    const calculateMetrics = () => {
-        if (!user || !user.months) return {
-            totalIncome: 0,
-            totalExpenses: 0,
-            currentSavings: 0,
-            totalEMIs: 0,
-            expenseRatio: 0,
-            emiRatio: 0
+    const calculateMetrics = useCallback(() => {
+        if (!user || !currentMonth) return {
+            totalIncome: 0, totalExpenses: 0, currentSavings: 0, totalEMIs: 0, expenseRatio: 0, emiRatio: 0
         };
-
-        // Handle months as a regular object (not Map)
-        const monthData = user.months[currentMonth] || { income: 0, expenses: [] };
-        const totalIncome = monthData.income;
+        const monthData = user.months && user.months[currentMonth];
+        if (!monthData) return {
+            totalIncome: 0, totalExpenses: 0, currentSavings: 0, totalEMIs: 0, expenseRatio: 0, emiRatio: 0
+        };
+        const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
         const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
         const totalEMIs = utils.calculateTotalEMIBurden(monthData.expenses);
         const currentSavings = totalIncome - totalExpenses;
         const expenseRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
         const emiRatio = totalIncome > 0 ? (totalEMIs / totalIncome) * 100 : 0;
-
-        return {
-            totalIncome,
-            totalExpenses,
-            currentSavings,
-            totalEMIs,
-            expenseRatio,
-            emiRatio
-        };
-    };
+        return { totalIncome, totalExpenses, currentSavings, totalEMIs, expenseRatio, emiRatio };
+    }, [user, currentMonth]);
 
     // Get available months for dropdown
     const getAvailableMonths = () => {
@@ -90,31 +78,32 @@ export default function Dashboard() {
     };
 
     // Generate monthly data for charts
-    const generateMonthlyData = () => {
+    const generateMonthlyData = useCallback(() => {
         if (!user || !user.months) return [];
 
-        const months = getAvailableMonths().slice(-6); // Last 6 months
-        const monthlyData = months.map(month => {
-            const monthData = user.months[month] || { income: 0, expenses: [] };
+        const months = Object.keys(user.months).sort();
+        return months.map(month => {
+            const monthData = user.months[month];
+            const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
+            const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
+            const savings = totalIncome - totalExpenses;
 
             return {
                 month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-                income: monthData.income,
-                expenses: utils.calculateTotalExpenses(monthData.expenses),
-                savings: monthData.income - utils.calculateTotalExpenses(monthData.expenses)
+                income: totalIncome,
+                expenses: totalExpenses,
+                savings: savings
             };
         });
-
-        return monthlyData;
-    };
+    }, [user]);
 
     // Generate category breakdown for pie chart
-    const generateCategoryBreakdown = () => {
-        if (!user || !user.months) return [];
+    const generateCategoryBreakdown = useCallback(() => {
+        if (!user || !currentMonth) return [];
+        const monthData = user.months && user.months[currentMonth];
+        if (!monthData) return [];
 
-        const monthData = user.months[currentMonth] || { income: 0, expenses: [] };
         const categoryMap = new Map();
-
         monthData.expenses.forEach((expense: any) => {
             const category = expense.category;
             const amount = expense.amount;
@@ -125,21 +114,24 @@ export default function Dashboard() {
             category,
             amount
         }));
-    };
+    }, [user, currentMonth]);
 
     // Generate spending trends for line chart
-    const generateSpendingTrends = () => {
+    const generateSpendingTrends = useCallback(() => {
         if (!user || !user.months) return [];
 
-        const months = getAvailableMonths().slice(-6);
+        const months = Object.keys(user.months).sort();
         return months.map(month => {
-            const monthData = user.months[month] || { income: 0, expenses: [] };
+            const monthData = user.months[month];
+            const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
+            const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
+            const savings = totalIncome - totalExpenses;
             return {
-                month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short' }),
-                spending: utils.calculateTotalExpenses(monthData.expenses)
+                month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+                savings: savings
             };
         });
-    };
+    }, [user]);
 
     // Generate alerts based on financial health
     const generateAlerts = () => {
@@ -264,7 +256,7 @@ export default function Dashboard() {
         labels: spendingTrends.map(d => d.month),
         datasets: [{
             label: 'Monthly Spending',
-            data: spendingTrends.map(d => d.spending),
+            data: spendingTrends.map(d => d.savings),
             borderColor: '#F70000',
             backgroundColor: 'rgba(247, 0, 0, 0.1)',
             fill: true,
@@ -464,18 +456,18 @@ export default function Dashboard() {
                                 <div
                                     key={index}
                                     className={`flex items-center space-x-3 p-3 rounded-lg ${alert.type === 'success' ? 'bg-green-500/10 border border-green-500/20' :
-                                            alert.type === 'warning' ? 'bg-yellow-500/10 border border-yellow-500/20' :
-                                                'bg-red-500/10 border border-red-500/20'
+                                        alert.type === 'warning' ? 'bg-yellow-500/10 border border-yellow-500/20' :
+                                            'bg-red-500/10 border border-red-500/20'
                                         }`}
                                 >
                                     <Icon className={`h-5 w-5 ${alert.type === 'success' ? 'text-green-400' :
-                                            alert.type === 'warning' ? 'text-yellow-400' :
-                                                'text-red-400'
+                                        alert.type === 'warning' ? 'text-yellow-400' :
+                                            'text-red-400'
                                         }`} />
                                     <div>
                                         <p className={`font-medium ${alert.type === 'success' ? 'text-green-400' :
-                                                alert.type === 'warning' ? 'text-yellow-400' :
-                                                    'text-red-400'
+                                            alert.type === 'warning' ? 'text-yellow-400' :
+                                                'text-red-400'
                                             }`}>
                                             {alert.title}
                                         </p>
@@ -494,9 +486,9 @@ export default function Dashboard() {
                     <div
                         key={toast.id}
                         className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' :
-                                toast.type === 'error' ? 'bg-red-500 text-white' :
-                                    toast.type === 'warning' ? 'bg-yellow-500 text-white' :
-                                        'bg-blue-500 text-white'
+                            toast.type === 'error' ? 'bg-red-500 text-white' :
+                                toast.type === 'warning' ? 'bg-yellow-500 text-white' :
+                                    'bg-blue-500 text-white'
                             }`}
                     >
                         {toast.message}

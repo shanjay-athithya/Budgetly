@@ -17,12 +17,18 @@ export interface User {
 }
 
 export interface MonthData {
-    income: number;
+    income: Array<{
+        _id?: any;
+        label: string;
+        amount: number;
+        source: string;
+        date: Date;
+    }>;
     expenses: Expense[];
 }
 
 export interface Expense {
-    _id?: string;
+    _id?: any;
     label: string;
     amount: number;
     category: string;
@@ -51,6 +57,7 @@ export interface ProductSuggestion {
 // User API
 export const userAPI = {
     async getUser(uid: string): Promise<User> {
+        console.log('🌐 userAPI.getUser called for UID:', uid);
         const response = await fetch(`/api/user?uid=${uid}`);
 
         if (!response.ok) {
@@ -60,7 +67,9 @@ export const userAPI = {
             throw new Error(`Failed to fetch user: ${response.statusText}`);
         }
 
-        return response.json();
+        const userData = await response.json();
+        console.log('🌐 userAPI.getUser returned data:', JSON.stringify(userData, null, 2));
+        return userData;
     },
 
     async createUser(userData: Partial<User>): Promise<User> {
@@ -98,7 +107,7 @@ export const userAPI = {
 
 // Income API
 export const incomeAPI = {
-    async getIncome(uid: string, month?: string): Promise<number> {
+    async getIncome(uid: string, month?: string): Promise<{ income: any[], totalIncome: number }> {
         const url = month
             ? `/api/income?uid=${uid}&month=${month}`
             : `/api/income?uid=${uid}`;
@@ -109,36 +118,55 @@ export const incomeAPI = {
             throw new Error(`Failed to fetch income: ${response.statusText}`);
         }
 
-        const data = await response.json();
-        return data.income || 0;
+        return response.json();
     },
 
-    async addIncome(uid: string, month: string, amount: number): Promise<void> {
+    async addIncome(uid: string, month: string, incomeEntry: any): Promise<{ success: boolean; user: User }> {
         const response = await fetch('/api/income', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ uid, month, amount }),
+            body: JSON.stringify({ uid, month, incomeEntry }),
         });
 
         if (!response.ok) {
             throw new Error(`Failed to add income: ${response.statusText}`);
         }
+
+        return response.json();
     },
 
-    async updateIncome(uid: string, month: string, amount: number): Promise<void> {
+    async updateIncome(uid: string, month: string, incomeId: string, incomeEntry: any): Promise<{ success: boolean; user: User }> {
         const response = await fetch('/api/income', {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ uid, month, amount }),
+            body: JSON.stringify({ uid, month, incomeId, incomeEntry }),
         });
 
         if (!response.ok) {
             throw new Error(`Failed to update income: ${response.statusText}`);
         }
+
+        return response.json();
+    },
+
+    async deleteIncome(uid: string, month: string, incomeId: string): Promise<{ success: boolean; user: User }> {
+        const response = await fetch('/api/income', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ uid, month, incomeId }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to delete income: ${response.statusText}`);
+        }
+
+        return response.json();
     },
 };
 
@@ -158,7 +186,7 @@ export const expensesAPI = {
         return response.json();
     },
 
-    async addExpense(uid: string, month: string, expense: Omit<Expense, '_id'>): Promise<Expense> {
+    async addExpense(uid: string, month: string, expense: Omit<Expense, '_id'>): Promise<{ success: boolean; user: User }> {
         const response = await fetch('/api/expenses', {
             method: 'POST',
             headers: {
@@ -174,7 +202,7 @@ export const expensesAPI = {
         return response.json();
     },
 
-    async updateExpense(uid: string, month: string, expenseId: string, expense: Partial<Expense>): Promise<Expense> {
+    async updateExpense(uid: string, month: string, expenseId: string, expense: Partial<Expense>): Promise<{ success: boolean; user: User }> {
         const response = await fetch('/api/expenses', {
             method: 'PUT',
             headers: {
@@ -190,7 +218,7 @@ export const expensesAPI = {
         return response.json();
     },
 
-    async deleteExpense(uid: string, month: string, expenseId: string): Promise<void> {
+    async deleteExpense(uid: string, month: string, expenseId: string): Promise<{ success: boolean; user: User }> {
         const response = await fetch('/api/expenses', {
             method: 'DELETE',
             headers: {
@@ -202,6 +230,8 @@ export const expensesAPI = {
         if (!response.ok) {
             throw new Error(`Failed to delete expense: ${response.statusText}`);
         }
+
+        return response.json();
     },
 };
 
@@ -304,7 +334,7 @@ export const utils = {
         const monthData = user.months[currentMonth];
         if (!monthData) return 0;
 
-        const income = monthData.income;
+        const income = monthData.income.reduce((sum, item) => sum + item.amount, 0);
         const expenses = this.calculateTotalExpenses(monthData.expenses);
         const emiBurden = this.calculateTotalEMIBurden(monthData.expenses);
         const savings = user.savings;

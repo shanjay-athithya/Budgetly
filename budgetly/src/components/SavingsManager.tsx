@@ -22,6 +22,7 @@ import {
     ArrowTrendingUpIcon
 } from '@heroicons/react/24/outline';
 import { useData } from '../context/DataContext';
+import { utils } from '../services/api';
 
 ChartJS.register(
     CategoryScale,
@@ -36,9 +37,9 @@ ChartJS.register(
 
 interface SavingsEntry {
     month: string; // YYYY-MM format
-    netIncome: number;
-    netExpense: number;
-    netSavings: number;
+    income: number;
+    expenses: number;
+    savings: number;
 }
 
 interface Toast {
@@ -60,42 +61,30 @@ export default function SavingsManager() {
 
     // Memoize the calculation to prevent infinite loops
     const calculateSavingsHistory = useCallback(() => {
-        if (!user || !user.months) {
-            setSavingsHistory([]);
-            setCurrentSavings(0);
-            return;
-        }
+        if (!user || !user.months) return [];
 
-        const monthlyData: { [key: string]: { income: number; expense: number } } = {};
+        const months = Object.keys(user.months).sort();
+        return months.map(month => {
+            const monthData = user.months[month];
+            const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
+            const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
+            const savings = totalIncome - totalExpenses;
 
-        // Process all months from user data
-        Object.entries(user.months).forEach(([month, monthData]) => {
-            monthlyData[month] = {
-                income: monthData.income || 0,
-                expense: monthData.expenses.reduce((sum, exp) => sum + exp.amount, 0)
+            return {
+                month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+                income: totalIncome,
+                expenses: totalExpenses,
+                savings: savings
             };
         });
-
-        // Convert to savings entries
-        const history: SavingsEntry[] = Object.keys(monthlyData)
-            .sort()
-            .map(month => ({
-                month,
-                netIncome: monthlyData[month].income,
-                netExpense: monthlyData[month].expense,
-                netSavings: monthlyData[month].income - monthlyData[month].expense
-            }));
-
-        setSavingsHistory(history);
-
-        // Calculate current total savings
-        const totalSavings = history.reduce((sum, entry) => sum + entry.netSavings, 0);
-        setCurrentSavings(totalSavings);
     }, [user]);
 
     // Calculate savings history when user data changes
     useEffect(() => {
-        calculateSavingsHistory();
+        const history = calculateSavingsHistory();
+        setSavingsHistory(history);
+        const totalSavings = history.reduce((sum, entry) => sum + entry.savings, 0);
+        setCurrentSavings(totalSavings);
     }, [calculateSavingsHistory]);
 
     // Toast management
@@ -160,14 +149,11 @@ export default function SavingsManager() {
 
         return {
             labels: savingsHistory.map(entry =>
-                new Date(entry.month + '-01').toLocaleDateString('en-US', {
-                    month: 'short',
-                    year: 'numeric'
-                })
+                entry.month
             ),
             datasets: [{
                 label: 'Net Savings',
-                data: savingsHistory.map(entry => entry.netSavings),
+                data: savingsHistory.map(entry => entry.savings),
                 borderColor: '#F70000',
                 backgroundColor: 'rgba(247, 0, 0, 0.1)',
                 fill: true,
@@ -178,24 +164,29 @@ export default function SavingsManager() {
 
     // Calculate current month savings
     const currentMonthSavings = useMemo(() => {
-        if (!user || !user.months || !user.months[currentMonth]) {
-            return 0;
-        }
+        if (!user || !currentMonth || !user.months) return 0;
+
         const monthData = user.months[currentMonth];
-        return (monthData.income || 0) - monthData.expenses.reduce((sum, exp) => sum + exp.amount, 0);
+        if (!monthData) return 0;
+
+        const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
+        const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
+        return totalIncome - totalExpenses;
     }, [user, currentMonth]);
 
     // Calculate savings rate
     const savingsRate = useMemo(() => {
-        if (!user || !user.months || !user.months[currentMonth]) {
-            return 0;
-        }
-        const monthData = user.months[currentMonth];
-        const income = monthData.income || 0;
-        if (income === 0) return 0;
+        if (!user || !currentMonth || !user.months) return 0;
 
-        const expenses = monthData.expenses.reduce((sum, exp) => sum + exp.amount, 0);
-        return ((income - expenses) / income) * 100;
+        const monthData = user.months[currentMonth];
+        if (!monthData) return 0;
+
+        const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
+        if (totalIncome === 0) return 0;
+
+        const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
+        const savings = totalIncome - totalExpenses;
+        return (savings / totalIncome) * 100;
     }, [user, currentMonth]);
 
     const formatDate = (dateString: string) => {
@@ -327,26 +318,26 @@ export default function SavingsManager() {
                         {savingsHistory.slice(-6).reverse().map((entry) => (
                             <div key={entry.month} className="p-6 flex items-center justify-between">
                                 <div className="flex items-center space-x-4">
-                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${entry.netSavings >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'
+                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${entry.savings >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'
                                         }`}>
-                                        <BuildingLibraryIcon className={`h-6 w-6 ${entry.netSavings >= 0 ? 'text-green-400' : 'text-red-400'
+                                        <BuildingLibraryIcon className={`h-6 w-6 ${entry.savings >= 0 ? 'text-green-400' : 'text-red-400'
                                             }`} />
                                     </div>
                                     <div>
                                         <h3 className="text-white font-medium">{formatDate(entry.month)}</h3>
                                         <p className="text-gray-400 text-sm">
-                                            Income: ₹{entry.netIncome.toLocaleString()} |
-                                            Expenses: ₹{entry.netExpense.toLocaleString()}
+                                            Income: ₹{entry.income.toLocaleString()} |
+                                            Expenses: ₹{entry.expenses.toLocaleString()}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className={`text-xl font-bold ${entry.netSavings >= 0 ? 'text-green-400' : 'text-red-400'
+                                    <p className={`text-xl font-bold ${entry.savings >= 0 ? 'text-green-400' : 'text-red-400'
                                         }`}>
-                                        ₹{entry.netSavings.toLocaleString()}
+                                        ₹{entry.savings.toLocaleString()}
                                     </p>
                                     <p className="text-gray-400 text-sm">
-                                        {entry.netIncome > 0 ? ((entry.netSavings / entry.netIncome) * 100).toFixed(1) : 0}% rate
+                                        {entry.income > 0 ? ((entry.savings / entry.income) * 100).toFixed(1) : 0}% rate
                                     </p>
                                 </div>
                             </div>
@@ -404,8 +395,8 @@ export default function SavingsManager() {
                     <div
                         key={toast.id}
                         className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' :
-                                toast.type === 'error' ? 'bg-red-500 text-white' :
-                                    'bg-blue-500 text-white'
+                            toast.type === 'error' ? 'bg-red-500 text-white' :
+                                'bg-blue-500 text-white'
                             }`}
                     >
                         {toast.message}

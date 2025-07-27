@@ -3,78 +3,89 @@
 import { useEffect, useState, useCallback } from 'react';
 import Layout from '../components/Layout';
 import Login from '../components/Login';
+import WelcomeMessage from '../components/WelcomeMessage';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 
 export default function Home() {
   const { user: authUser, loading: authLoading } = useAuth();
-  const { state, loadUser, createUser } = useData();
+  const { state, loadUser } = useData();
   const { user: dbUser, loading: dbLoading, error } = state;
   const [isInitialized, setIsInitialized] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [pendingSavings, setPendingSavings] = useState<number | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
+  console.log('🏠 Home component render - loadUser function:', typeof loadUser);
+  console.log('🏠 Home component render - authUser:', authUser?.uid);
+  console.log('🏠 Home component render - authLoading:', authLoading);
+  console.log('🏠 Home component render - dbLoading:', dbLoading);
+
   // Memoize the initialization function to prevent infinite loops
-  const initializeUser = useCallback(async (savings?: number) => {
+  const initializeUser = useCallback(async () => {
     if (!authUser) {
+      console.log('🔐 No auth user, setting initialized');
       setIsInitialized(true);
       return;
     }
 
+    console.log('🚀 Initializing user for:', authUser.uid);
     try {
       setConnectionError(null);
       // Try to load existing user from database
       try {
+        console.log('📥 Attempting to load user from database...');
+        console.log('📥 About to call loadUser with UID:', authUser.uid);
         await loadUser(authUser.uid);
+        console.log('✅ User loaded successfully, setting isNewUser to false');
         setIsNewUser(false);
       } catch (error: any) {
         // Check if this is a "user not found" error (404) vs a connection error
         if (error.message && error.message.includes('User not found')) {
           // This is expected for new users
+          console.log('👤 User not found, setting isNewUser to true');
           setIsNewUser(true);
-          if (savings !== undefined) {
-            // Create new user with the provided savings amount
-            console.log('Creating new user in database with savings:', savings);
-            await createUser({
-              uid: authUser.uid,
-              email: authUser.email || '',
-              name: authUser.displayName || 'User',
-              photoURL: authUser.photoURL || undefined,
-              location: '',
-              occupation: '',
-              savings: savings
-            });
-            setIsNewUser(false);
-          }
         } else {
           // This is a real connection error
-          console.error('Connection error:', error);
+          console.error('❌ Connection error:', error);
           setConnectionError(error.message || 'Failed to connect to database');
         }
       }
     } catch (error: any) {
-      console.error('Failed to initialize user:', error);
+      console.error('❌ Failed to initialize user:', error);
       setConnectionError(error.message || 'Failed to initialize user');
     } finally {
+      console.log('🏁 Setting initialized to true');
       setIsInitialized(true);
     }
-  }, [authUser, loadUser, createUser]);
+  }, [authUser, loadUser]);
 
   // Initialize user data when Firebase auth user changes
   useEffect(() => {
-    if (pendingSavings !== null) {
-      initializeUser(pendingSavings);
-      setPendingSavings(null);
-    } else {
-      initializeUser();
-    }
-  }, [initializeUser, pendingSavings]);
+    console.log('🔄 useEffect triggered - authUser:', authUser?.uid, 'loadUser function:', !!loadUser);
+    console.log('🔄 useEffect - loadUser function type:', typeof loadUser);
+    console.log('🔄 useEffect - loadUser function toString:', loadUser?.toString().substring(0, 50));
+    console.log('🔄 useEffect - authLoading:', authLoading);
 
-  // Handle new user signup with savings
-  const handleNewUserSignup = useCallback((savings: number) => {
-    setPendingSavings(savings);
-  }, []);
+    // Only run if authentication is not loading and we have an auth user
+    if (!authLoading && authUser) {
+      console.log('🔄 Authentication ready, initializing user');
+      initializeUser();
+    } else if (!authLoading && !authUser) {
+      console.log('🔄 Authentication ready but no user, setting initialized');
+      setIsInitialized(true);
+    }
+  }, [authUser, authLoading, initializeUser]);
+
+  // Handle new user setup completion
+  const handleNewUserComplete = useCallback(() => {
+    console.log('handleNewUserComplete called, setting isNewUser to false');
+    setIsNewUser(false);
+    // Reload user data after creation
+    if (authUser) {
+      console.log('Reloading user data for:', authUser.uid);
+      loadUser(authUser.uid);
+    }
+  }, [authUser, loadUser]);
 
   // Show loading state while authentication is initializing
   if (authLoading || (!authUser && !isInitialized)) {
@@ -91,7 +102,12 @@ export default function Home() {
 
   // Show login page if user is not authenticated
   if (!authUser) {
-    return <Login onNewUserSignup={handleNewUserSignup} />;
+    return <Login />;
+  }
+
+  // Show new user setup if user is new
+  if (isNewUser) {
+    return <WelcomeMessage onComplete={handleNewUserComplete} />;
   }
 
   // Show loading state while database is loading
@@ -117,19 +133,19 @@ export default function Home() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Connection Error</h2>
-          <p className="text-gray-400 mb-6">{connectionError}</p>
+          <h3 className="text-lg font-semibold text-white mb-2">Connection Error</h3>
+          <p className="text-gray-400 mb-4">{connectionError}</p>
           <button
             onClick={() => window.location.reload()}
-            className="bg-[#F70000] hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            className="bg-[#F70000] hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
           >
-            Retry Connection
+            Try Again
           </button>
         </div>
       </div>
     );
   }
 
-  // Show main app
+  // Show main application
   return <Layout />;
 }

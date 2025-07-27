@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
 import IncomeManager from './IncomeManager';
@@ -9,7 +9,6 @@ import SavingsManager from './SavingsManager';
 import EMIManager from './EMIManager';
 import SuggestionsManager from './SuggestionsManager';
 import ReportsManager from './ReportsManager';
-import WelcomeMessage from './WelcomeMessage';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 
@@ -20,22 +19,6 @@ export default function Layout() {
 
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [currentSection, setCurrentSection] = useState('dashboard');
-    const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
-
-    // Check if this is a new user (first time login)
-    useEffect(() => {
-        if (dbUser && dbUser.createdAt) {
-            const userCreatedAt = new Date(dbUser.createdAt);
-            const now = new Date();
-            const timeDiff = now.getTime() - userCreatedAt.getTime();
-            const minutesDiff = timeDiff / (1000 * 60);
-
-            // Show welcome message if user was created in the last 5 minutes
-            if (minutesDiff < 5) {
-                setShowWelcomeMessage(true);
-            }
-        }
-    }, [dbUser]);
 
     // Memoize the navigation handler to prevent infinite loops
     const handleNavigate = useCallback((section: string) => {
@@ -149,15 +132,6 @@ export default function Layout() {
                     {renderSectionContent()}
                 </main>
             </div>
-
-            {/* Welcome Message for New Users */}
-            {showWelcomeMessage && dbUser && (
-                <WelcomeMessage
-                    userName={dbUser.name}
-                    savingsAmount={dbUser.savings}
-                    onDismiss={() => setShowWelcomeMessage(false)}
-                />
-            )}
         </div>
     );
 } 

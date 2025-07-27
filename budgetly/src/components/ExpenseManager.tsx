@@ -16,17 +16,18 @@ import { useData } from '../context/DataContext';
 import { utils } from '../services/api';
 
 interface ExpenseEntry {
-    _id?: string;
+    _id?: any;
     label: string;
     amount: number;
     category: string;
     date: Date | string;
     type: 'one-time' | 'emi';
+    note?: string;
     emiDetails?: {
         duration: number;
         remainingMonths: number;
         monthlyAmount: number;
-        startedOn: Date | string;
+        startedOn: Date;
     };
 }
 
@@ -55,7 +56,6 @@ export default function ExpenseManager() {
     const { state, addExpense, updateExpense, deleteExpense } = useData();
     const { user, currentMonth, expenses, emis, loading, error } = state;
 
-    const [localExpenses, setLocalExpenses] = useState<ExpenseEntry[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [editingExpense, setEditingExpense] = useState<ExpenseEntry | null>(null);
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -96,34 +96,20 @@ export default function ExpenseManager() {
         return '';
     }, []);
 
-    // Load expenses for current month
-    useEffect(() => {
-        if (user && currentMonth && user.months) {
-            const monthData = user.months[currentMonth];
-            if (monthData && monthData.expenses && monthData.expenses.length > 0) {
-                setLocalExpenses(monthData.expenses);
-            } else {
-                setLocalExpenses([]);
-            }
-        } else {
-            setLocalExpenses([]);
-        }
-    }, [user, currentMonth]);
-
     // Update filters when currentMonth changes
     useEffect(() => {
         setFilters(prev => ({ ...prev, month: currentMonth }));
     }, [currentMonth]);
 
-    // Calculate totals
-    const totalExpenses = localExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-    const currentMonthExpenses = localExpenses.filter(expense => {
+    // Calculate totals using global expenses state
+    const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const currentMonthExpenses = expenses.filter(expense => {
         const expenseDate = getDateString(expense.date);
         return expenseDate === currentMonth;
     }).reduce((sum, expense) => sum + expense.amount, 0);
 
-    // Filter expenses
-    const filteredExpenses = localExpenses.filter(expense => {
+    // Filter expenses using global expenses state
+    const filteredExpenses = expenses.filter(expense => {
         const expenseDate = getDateString(expense.date);
         const matchesMonth = expenseDate === filters.month;
         const matchesCategory = filters.category === 'all' || expense.category === filters.category;
