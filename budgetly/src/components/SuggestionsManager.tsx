@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useData } from '../context/DataContext';
 import {
     LightBulbIcon,
     CalculatorIcon,
@@ -25,12 +26,6 @@ interface SuggestionEntry {
     timestamp: Date;
 }
 
-interface SuggestionsManagerProps {
-    incomes?: any[];
-    expenses?: any[];
-    emis?: any[];
-}
-
 interface Toast {
     id: string;
     message: string;
@@ -50,7 +45,10 @@ const PRODUCT_CATEGORIES = [
     'Other'
 ];
 
-export default function SuggestionsManager({ incomes = [], expenses = [], emis = [] }: SuggestionsManagerProps) {
+export default function SuggestionsManager() {
+    const { state } = useData();
+    const { user, currentMonth } = state;
+
     const [suggestions, setSuggestions] = useState<SuggestionEntry[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [currentSuggestion, setCurrentSuggestion] = useState<SuggestionEntry | null>(null);
@@ -68,23 +66,35 @@ export default function SuggestionsManager({ incomes = [], expenses = [], emis =
     });
 
     // Calculate financial metrics
-    const calculateFinancialMetrics = () => {
-        const currentMonth = new Date().toISOString().slice(0, 7);
+    const calculateFinancialMetrics = useCallback(() => {
+        if (!user || !user.months || !user.months[currentMonth]) {
+            return {
+                monthlyIncome: 0,
+                monthlyExpenses: 0,
+                existingEMIs: 0,
+                savings: 0,
+                expenseRatio: 0
+            };
+        }
+
+        const monthData = user.months[currentMonth];
 
         // Calculate monthly income
-        const monthlyIncome = incomes
-            .filter(income => income.date === currentMonth)
-            .reduce((sum, income) => sum + income.amount, 0);
+        const monthlyIncome = monthData.income && Array.isArray(monthData.income)
+            ? monthData.income.reduce((sum, income) => sum + income.amount, 0)
+            : 0;
 
         // Calculate monthly expenses
-        const monthlyExpenses = expenses
-            .filter(expense => expense.date.startsWith(currentMonth))
-            .reduce((sum, expense) => sum + expense.amount, 0);
+        const monthlyExpenses = monthData.expenses && Array.isArray(monthData.expenses)
+            ? monthData.expenses.reduce((sum, expense) => sum + expense.amount, 0)
+            : 0;
 
         // Calculate existing EMIs
-        const existingEMIs = emis
-            .filter(emi => emi.isActive)
-            .reduce((sum, emi) => sum + emi.monthlyInstallment, 0);
+        const existingEMIs = monthData.expenses && Array.isArray(monthData.expenses)
+            ? monthData.expenses
+                .filter(expense => expense.type === 'emi' && expense.emiDetails)
+                .reduce((sum, expense) => sum + (expense.emiDetails?.monthlyAmount || 0), 0)
+            : 0;
 
         // Calculate savings
         const savings = monthlyIncome - monthlyExpenses;
@@ -96,7 +106,7 @@ export default function SuggestionsManager({ incomes = [], expenses = [], emis =
             savings,
             expenseRatio: monthlyIncome > 0 ? (monthlyExpenses / monthlyIncome) * 100 : 0
         };
-    };
+    }, [user, currentMonth]);
 
     // Toast management
     const addToast = (message: string, type: Toast['type']) => {
@@ -110,7 +120,19 @@ export default function SuggestionsManager({ incomes = [], expenses = [], emis =
     // Form handlers
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+
+        // Handle input type changes
+        if (name === 'inputType') {
+            setFormData(prev => ({
+                ...prev,
+                [name]: value as 'fullPrice' | 'emi',
+                // Clear the other field when switching input types
+                fullPrice: value === 'emi' ? '' : prev.fullPrice,
+                monthlyEMI: value === 'fullPrice' ? '' : prev.monthlyEMI
+            }));
+        } else {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
     };
 
     const resetForm = () => {
@@ -198,25 +220,69 @@ export default function SuggestionsManager({ incomes = [], expenses = [], emis =
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.productName || (!formData.fullPrice && !formData.monthlyEMI) || !formData.duration) {
-            addToast('Please fill in all required fields', 'error');
+        // Enhanced validation
+        if (!formData.productName.trim()) {
+            addToast('Please enter a product name', 'error');
             return;
         }
 
-        const duration = parseInt(formData.duration);
+        let duration = 0;
+        if (formData.inputType === 'emi') {
+            if (!formData.duration || parseInt(formData.duration) <= 0) {
+                addToast('Please enter a valid duration (minimum 1 month)', 'error');
+                return;
+            }
+            duration = parseInt(formData.duration);
+
+            if (duration > 120) { // 10 years max
+                addToast('Duration cannot exceed 120 months (10 years)', 'error');
+                return;
+            }
+        }
+
         let fullPrice = 0;
         let monthlyEMI = 0;
 
         if (formData.inputType === 'fullPrice') {
-            fullPrice = parseFloat(formData.fullPrice);
-            monthlyEMI = calculateEMI(fullPrice, duration);
+            if (!formData.fullPrice || formData.fullPrice.trim() === '') {
+                addToast('Please enter a full price', 'error');
+                return;
+            }
+            const priceValue = parseFloat(formData.fullPrice);
+            if (isNaN(priceValue) || priceValue <= 0) {
+                addToast('Please enter a valid full price (greater than 0)', 'error');
+                return;
+            }
+            fullPrice = priceValue;
+            monthlyEMI = 0; // No monthly payment for full price purchase
         } else {
-            monthlyEMI = parseFloat(formData.monthlyEMI);
+            if (!formData.monthlyEMI || formData.monthlyEMI.trim() === '') {
+                addToast('Please enter a monthly EMI amount', 'error');
+                return;
+            }
+            const emiValue = parseFloat(formData.monthlyEMI);
+            if (isNaN(emiValue) || emiValue <= 0) {
+                addToast('Please enter a valid monthly EMI amount (greater than 0)', 'error');
+                return;
+            }
+            monthlyEMI = emiValue;
             fullPrice = calculateTotalPrice(monthlyEMI, duration);
         }
 
-        if (isNaN(fullPrice) || isNaN(monthlyEMI) || fullPrice <= 0 || monthlyEMI <= 0) {
+        // Additional validation for reasonable limits
+        if (fullPrice <= 0) {
             addToast('Please enter valid amounts', 'error');
+            return;
+        }
+
+        // Check for reasonable limits
+        if (fullPrice > 10000000) { // 10 million max
+            addToast('Price cannot exceed $10,000,000', 'error');
+            return;
+        }
+
+        if (monthlyEMI > 10000000) { // 1M max monthly EMI
+            addToast('Monthly EMI cannot exceed $1,000,000', 'error');
             return;
         }
 
@@ -224,7 +290,7 @@ export default function SuggestionsManager({ incomes = [], expenses = [], emis =
 
         const newSuggestion: SuggestionEntry = {
             id: Date.now().toString(),
-            productName: formData.productName,
+            productName: formData.productName.trim(),
             fullPrice,
             monthlyEMI,
             duration,
@@ -237,6 +303,9 @@ export default function SuggestionsManager({ incomes = [], expenses = [], emis =
         setCurrentSuggestion(newSuggestion);
         setSuggestions(prev => [newSuggestion, ...prev]);
         addToast('Suggestion generated successfully!', 'success');
+
+        // Close form after successful submission
+        closeForm();
     };
 
     // Save as planned EMI
@@ -273,7 +342,42 @@ export default function SuggestionsManager({ incomes = [], expenses = [], emis =
         }
     };
 
-    const metrics = calculateFinancialMetrics();
+    const metrics = useMemo(() => calculateFinancialMetrics(), [calculateFinancialMetrics]);
+
+    // Loading state
+    if (state.loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#F70000]"></div>
+            </div>
+        );
+    }
+
+    // Error state
+    if (state.error) {
+        return (
+            <div className="text-center py-8">
+                <div className="text-red-500 mb-4">
+                    <LightBulbIcon className="h-12 w-12 mx-auto" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">Error Loading Suggestions</h3>
+                <p className="text-gray-400">{state.error}</p>
+            </div>
+        );
+    }
+
+    // No data state
+    if (!user || !user.months || Object.keys(user.months).length === 0) {
+        return (
+            <div className="text-center py-8">
+                <div className="text-gray-500 mb-4">
+                    <LightBulbIcon className="h-12 w-12 mx-auto" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">No Data Available</h3>
+                <p className="text-gray-400">Add some income and expenses to get financial suggestions</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -283,7 +387,7 @@ export default function SuggestionsManager({ incomes = [], expenses = [], emis =
                     <div
                         key={toast.id}
                         className={`px-4 py-3 rounded-lg shadow-lg text-white font-medium transition-all duration-300 ${toast.type === 'success' ? 'bg-green-500' :
-                                toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                            toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
                             }`}
                     >
                         {toast.message}
@@ -539,31 +643,45 @@ export default function SuggestionsManager({ incomes = [], expenses = [], emis =
                                         name={formData.inputType === 'fullPrice' ? 'fullPrice' : 'monthlyEMI'}
                                         value={formData.inputType === 'fullPrice' ? formData.fullPrice : formData.monthlyEMI}
                                         onChange={handleInputChange}
-                                        placeholder="0.00"
-                                        step="0.01"
-                                        min="0"
+                                        placeholder={formData.inputType === 'fullPrice' ? '1000.00' : '100.00'}
+                                        step="any"
+                                        min="0.01"
+                                        max={formData.inputType === 'fullPrice' ? '10000000' : '100000'}
                                         className="w-full pl-8 pr-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent placeholder-gray-500"
                                         required
                                     />
                                 </div>
+                                <p className="text-gray-500 text-xs mt-1">
+                                    {formData.inputType === 'fullPrice'
+                                        ? 'Enter the total price of the product'
+                                        : 'Enter the monthly EMI amount you would pay'
+                                    }
+                                </p>
                             </div>
 
-                            {/* Duration */}
-                            <div>
-                                <label className="block text-gray-300 text-sm font-medium mb-2">
-                                    Duration (months) *
-                                </label>
-                                <input
-                                    type="number"
-                                    name="duration"
-                                    value={formData.duration}
-                                    onChange={handleInputChange}
-                                    placeholder="12"
-                                    min="1"
-                                    className="w-full px-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent placeholder-gray-500"
-                                    required
-                                />
-                            </div>
+                            {/* Duration - Only show for EMI */}
+                            {formData.inputType === 'emi' && (
+                                <div>
+                                    <label className="block text-gray-300 text-sm font-medium mb-2">
+                                        Duration (months) *
+                                    </label>
+                                    <input
+                                        type="number"
+                                        name="duration"
+                                        value={formData.duration}
+                                        onChange={handleInputChange}
+                                        placeholder="12"
+                                        min="1"
+                                        max="120"
+                                        step="1"
+                                        className="w-full px-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent placeholder-gray-500"
+                                        required
+                                    />
+                                    <p className="text-gray-500 text-xs mt-1">
+                                        Enter the number of months for EMI (1-120 months)
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Category */}
                             <div>
@@ -584,12 +702,13 @@ export default function SuggestionsManager({ incomes = [], expenses = [], emis =
                             </div>
 
                             {/* Calculation Preview */}
-                            {formData.fullPrice && formData.duration && formData.inputType === 'fullPrice' && (
+                            {formData.fullPrice && formData.inputType === 'fullPrice' && (
                                 <div className="bg-[#383838] rounded-lg p-4 border border-gray-600">
-                                    <p className="text-gray-400 text-sm mb-1">Calculated Monthly EMI</p>
+                                    <p className="text-gray-400 text-sm mb-1">Full Price Purchase</p>
                                     <p className="text-2xl font-bold text-[#F70000]">
-                                        ${calculateEMI(parseFloat(formData.fullPrice), parseInt(formData.duration)).toFixed(0)}
+                                        ${parseFloat(formData.fullPrice).toLocaleString()}
                                     </p>
+                                    <p className="text-gray-500 text-xs mt-1">One-time payment</p>
                                 </div>
                             )}
 
