@@ -85,7 +85,7 @@ export default function Layout() {
             {/* Main Content */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Header */}
-                <header className="bg-[#232326] border-b border-gray-600 px-6 py-4">
+                <header className="bg-[#232326] border-b border-gray-600 px-6 py-5.5">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                             <button
@@ -97,8 +97,8 @@ export default function Layout() {
                                 </svg>
                             </button>
                             <div>
-                                <h1 className="text-xl font-bold text-white">{getSectionTitle()}</h1>
-                                <p className="text-gray-400 text-sm">{getSectionDescription()}</p>
+                                <h3 className="text-xl font-bold text-white">Smarter spending. Stress free saving. Thats Budgetly.</h3>
+                                
                             </div>
                         </div>
 

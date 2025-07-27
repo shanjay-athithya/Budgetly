@@ -176,7 +176,7 @@ export default function SuggestionsManager() {
         // Rule 1: Monthly EMI should be ≤ 25% of monthly income
         if (monthlyEMI > monthlyIncome * 0.25) {
             suggestion = 'risky';
-            reasons.push(`EMI ($${monthlyEMI.toLocaleString()}) exceeds 25% of monthly income`);
+            reasons.push(`EMI (₹${monthlyEMI.toLocaleString()}) exceeds 25% of monthly income`);
         }
 
         // Rule 2: Total EMIs (existing + new) should be ≤ 40% of monthly income
