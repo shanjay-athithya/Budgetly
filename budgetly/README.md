@@ -1,157 +1,172 @@
-# Budgetly - Personal Finance Tracker
+# 💰 Budgetly - Personal Finance Management App
 
-A comprehensive personal finance management application built with Next.js, MongoDB, and React. Track your income, expenses, EMIs, and get smart financial suggestions.
+A full-stack personal finance management application built with Next.js, Firebase Authentication, MongoDB, and Tailwind CSS. Budgetly helps users track income, manage expenses, plan EMIs, and get smart product suggestions based on their financial health.
+
+## 📌 Project Overview
+
+Budgetly is a comprehensive personal finance tracker that empowers users to take control of their financial life. The app provides intuitive tools for tracking income and expenses, planning EMIs, analyzing spending patterns, and making informed purchasing decisions.
+
+### Core Features
+- **Income & Expense Tracking**: Add, edit, and delete income sources and expenses with detailed categorization
+- **EMI Planner**: Manage and track EMIs with time-based planning and payment status
+- **Financial Dashboard**: Visual analytics with charts showing spending trends and category breakdowns
+- **Smart Suggestions**: AI-powered product recommendations based on financial health and affordability
+- **Profile Management**: Complete user profile setup with savings, occupation, and location
+- **Monthly Reports**: Generate comprehensive financial reports with PDF export functionality
 
 ## 🚀 Features
 
-### 📊 Dashboard
-- **Month-based filtering** with dropdown selector
-- **Real-time financial metrics** (Income, Expenses, Savings, EMIs)
-- **Interactive charts** (Bar, Pie, Line charts)
-- **Budget alerts** and financial health scoring
-- **Quick insights** and spending trends
+### Authentication & User Management
+- **Google & Email Login**: Secure authentication using Firebase Auth
+- **Profile Setup**: Complete user profile with initial savings, occupation, and location
+- **User Session Management**: Persistent login state with automatic data synchronization
 
-### 💰 Income Management
-- Add/edit/delete income entries
-- Month-wise income tracking
-- Income source categorization
-- Historical income analysis
+### Financial Management
+- **Income Manager**: Track multiple income sources with history and monthly breakdown
+- **Expense Manager**: Categorize expenses with detailed tracking and filtering
+- **EMI Planner**: Manage EMIs with remaining months tracking and payment status
+- **Savings Tracker**: Monitor savings growth and financial health score
 
-### 💸 Expense Management
-- **Comprehensive expense tracking** with categories
-- **EMI integration** with duration and monthly payments
-- **Filtering** by month and category
-- **Expense history** and analytics
+### Analytics & Reporting
+- **Dashboard Analytics**: Real-time financial metrics with Chart.js visualizations
+- **Monthly Breakdown**: Bar charts showing income vs expenses trends
+- **Category Analysis**: Spending breakdown by category with percentage calculations
+- **PDF Reports**: Generate and download comprehensive financial reports
 
-### 🏦 EMI Tracker
-- **Active EMIs** with progress tracking
-- **EMI history** for completed payments
-- **Monthly installment** calculations
-- **Payment status** monitoring
+### Smart Features
+- **Product Suggestions**: AI-powered recommendations based on financial capacity
+- **Affordability Calculator**: Check if products are financially advisable
+- **Financial Health Score**: Automated scoring based on income, expenses, and savings
 
-### 💡 Financial Suggestions
-- **Smart purchase recommendations** based on financial health
-- **Rule-based analysis** (EMI burden, savings rate, etc.)
-- **Product suggestion history**
-- **Risk assessment** (Good/Moderate/Risky)
+### User Experience
+- **Responsive Design**: Mobile-first design with Tailwind CSS
+- **Dark Theme**: Modern dark interface with red accent colors
+- **Sidebar Navigation**: Intuitive navigation with collapsible sidebar
+- **Real-time Updates**: Instant data synchronization across all components
 
-### 📈 Reports & Analytics
-- **Monthly financial reports** with PDF export
-- **Income vs Expenses** analysis
-- **Category-wise breakdown** charts
-- **Top spending categories** identification
-- **Share functionality** for reports
+## 🧩 Components
 
-### 💾 Savings Overview
-- **Current savings** tracking
-- **Monthly savings trends** with charts
-- **Savings history** table
-- **Manual savings adjustment**
+### Core Layout Components
+- **Header**: User profile display and navigation controls
+- **Sidebar**: Main navigation with collapsible menu
+- **Layout**: Main application wrapper with authentication checks
 
-## 🛠 Tech Stack
+### Financial Management Components
+- **IncomeManager**: Income tracking with add/edit/delete functionality
+- **ExpenseManager**: Expense management with categorization and filtering
+- **EMIManager**: EMI planning and tracking with payment status
+- **SavingsManager**: Savings tracking and financial health monitoring
 
-- **Frontend**: Next.js 15, React 19, TypeScript
-- **Styling**: Tailwind CSS 4, Lexend Font
-- **Charts**: Chart.js, React-Chartjs-2
-- **Icons**: Heroicons
-- **Database**: MongoDB with Mongoose
-- **State Management**: React Context + useReducer
-- **API**: Next.js API Routes
+### Analytics & Reporting Components
+- **Dashboard**: Main analytics dashboard with charts and metrics
+- **ReportsManager**: Comprehensive reporting with PDF generation
+- **WelcomeMessage**: New user onboarding and initial setup
 
-## 📁 Project Structure
+### Smart Features Components
+- **SuggestionsManager**: Product recommendations and affordability analysis
+- **ProfileModal**: User profile management and settings
 
-```
-budgetly/
-├── src/
-│   ├── app/
-│   │   ├── api/                    # API routes
-│   │   │   ├── user/               # User management
-│   │   │   ├── income/             # Income operations
-│   │   │   ├── expenses/           # Expense operations
-│   │   │   └── suggestions/        # Product suggestions
-│   │   ├── layout.tsx              # Root layout
-│   │   └── page.tsx                # Main page
-│   ├── components/                 # React components
-│   │   ├── Layout.tsx              # Main layout wrapper
-│   │   ├── Sidebar.tsx             # Navigation sidebar
-│   │   ├── Dashboard.tsx           # Dashboard overview
-│   │   ├── IncomeManager.tsx       # Income management
-│   │   ├── ExpenseManager.tsx      # Expense management
-│   │   ├── SavingsManager.tsx      # Savings tracking
-│   │   ├── EMIManager.tsx          # EMI management
-│   │   ├── ReportsManager.tsx      # Financial reports
-│   │   └── SuggestionsManager.tsx  # Financial suggestions
-│   ├── context/
-│   │   └── DataContext.tsx         # Global state management
-│   └── services/
-│       └── api.ts                  # API service layer
-├── lib/
-│   └── mongoose.ts                 # MongoDB connection
-├── models/
-│   ├── User.ts                     # User schema
-│   └── ProductSuggestion.ts        # Suggestion schema
-└── public/                         # Static assets
-```
+### Authentication Components
+- **Login**: Firebase authentication with Google and email options
 
-## 🗄 Database Schema
+## ⚙️ Custom Hooks
+
+### Data Management
+- **useData**: Global state management for user data, income, expenses, and EMIs
+- **useAuth**: Firebase authentication state management
+
+### Context Providers
+- **DataContext**: Centralized state management for financial data
+- **AuthProvider**: Authentication state and user session management
+
+## 📦 Packages Used
+
+### Core Framework
+- **Next.js 15.4.3**: React framework with App Router
+- **React 18**: UI library
+- **TypeScript**: Type-safe JavaScript
+
+### Authentication & Database
+- **Firebase**: Authentication and user management
+- **MongoDB**: NoSQL database for data persistence
+- **Mongoose**: MongoDB object modeling
+
+### UI & Styling
+- **Tailwind CSS**: Utility-first CSS framework
+- **Chart.js**: Data visualization library
+- **Heroicons**: Icon library
+
+### PDF Generation
+- **jsPDF**: Client-side PDF generation
+- **html2canvas**: HTML to canvas conversion for PDF
+
+### Development Tools
+- **ESLint**: Code linting and quality
+- **PostCSS**: CSS processing
+- **Autoprefixer**: CSS vendor prefixing
+
+## 🧠 MongoDB Schema Design
 
 ### User Schema
 ```typescript
-{
-  _id: ObjectId,
-  uid: string,                      // Firebase UID
-  email: string,                    // User email
-  name: string,                     // User name
-  photoURL?: string,                // Profile photo
-  savings: number,                  // Current savings
-  location?: string,                // User location
-  occupation?: string,              // User occupation
-  months: {                         // Month-wise data
+interface User {
+  _id: string;
+  uid: string;                    // Firebase UID
+  email: string;
+  name: string;
+  occupation?: string;
+  location?: string;
+  months: {
     [monthKey: string]: {
-      income: number,
-      expenses: [{
-        label: string,
-        amount: number,
-        category: string,
-        date: Date,
-        type: "one-time" | "emi",
-        emiDetails?: {
-          duration: number,
-          remainingMonths: number,
-          monthlyAmount: number,
-          startedOn: Date
-        }
-      }]
+      income: IncomeEntry[];      // Array of income entries
+      expenses: Expense[];        // Array of expense entries
+      savings: number;            // Monthly savings
     }
-  },
-  createdAt: Date,
-  updatedAt: Date
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface IncomeEntry {
+  _id?: string;
+  amount: number;
+  source: string;
+  date: Date;
+  description?: string;
+}
+
+interface Expense {
+  _id?: string;
+  amount: number;
+  category: string;
+  description: string;
+  date: Date;
+  type: 'expense' | 'emi';
+  emiDetails?: {
+    monthlyAmount: number;
+    totalAmount: number;
+    remainingMonths: number;
+    isActive: boolean;
+  };
 }
 ```
 
-### ProductSuggestion Schema
-```typescript
-{
-  _id: ObjectId,
-  uid: string,                      // User ID
-  productName: string,              // Product name
-  price: number,                    // Product price
-  emiAmount?: number,               // Monthly EMI
-  duration?: number,                // EMI duration
-  suggestionScore: "Good" | "Moderate" | "Risky",
-  reason: string,                   // Suggestion reason
-  suggestedAt: Date                 // Suggestion timestamp
-}
-```
+## 🌐 API Routes
 
-## 🚀 Getting Started
+### User Management
+- **GET/POST `/api/user`**: User creation and profile management
+- **GET/PUT `/api/profile`**: Profile data retrieval and updates
 
-### Prerequisites
-- Node.js 18+ 
-- MongoDB (local or MongoDB Atlas)
-- npm or yarn
+### Financial Data
+- **GET/POST/PUT/DELETE `/api/income`**: Income CRUD operations
+- **GET/POST/PUT/DELETE `/api/expenses`**: Expense CRUD operations
 
-### Installation
+### Smart Features
+- **GET/POST `/api/suggestions`**: Product suggestions and affordability analysis
+
+## 🧪 Deployment Instructions
+
+### Environment Setup
 
 1. **Clone the repository**
    ```bash
@@ -164,126 +179,201 @@ budgetly/
    npm install
    ```
 
-3. **Set up environment variables**
-   Create a `.env.local` file in the root directory:
+3. **Create `.env.local` file**
    ```env
-   MONGODB_URI=mongodb://localhost:27017/budgetly
+   # Firebase Configuration
+   NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+   NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+
+   # MongoDB Configuration
+   MONGODB_URI=your_mongodb_connection_string
    ```
 
-4. **Start MongoDB**
-   - **Local MongoDB**: Start your local MongoDB service
-   - **MongoDB Atlas**: Use your Atlas connection string
-
-5. **Run the development server**
-```bash
-npm run dev
-   ```
-
-6. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
-## 🔧 Configuration
+### Firebase Setup
+1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
+2. Enable Authentication with Google and Email providers
+3. Copy Firebase configuration to `.env.local`
 
 ### MongoDB Setup
+1. Create a MongoDB Atlas cluster or use local MongoDB
+2. Set up database connection string in `.env.local`
+3. Ensure proper network access and authentication
 
-#### Local MongoDB
-1. Install MongoDB Community Edition
-2. Start MongoDB service
-3. Create database: `budgetly`
+### Development
+```bash
+# Run development server
+npm run dev
 
-#### MongoDB Atlas (Recommended for Production)
-1. Create MongoDB Atlas account
-2. Create a new cluster
-3. Get connection string
-4. Update `MONGODB_URI` in `.env.local`
+# Build for production
+npm run build
 
-### Environment Variables
-
-```env
-# Required
-MONGODB_URI=mongodb://localhost:27017/budgetly
-
-# Optional (for Firebase Auth)
-NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+# Start production server
+npm start
 ```
 
-## 📱 Usage
-
-### Dashboard
-- View financial overview with month selector
-- Monitor income, expenses, savings, and EMIs
-- Check financial health alerts
-- Analyze spending trends
-
-### Income Management
-- Add new income entries with source and amount
-- Edit existing income records
-- View income history by month
-
-### Expense Management
-- Add expenses with categories
-- Track EMI payments with duration
-- Filter expenses by month and category
-- View expense analytics
-
-### EMI Tracker
-- Monitor active EMIs with progress
-- Track payment history
-- Calculate remaining payments
-- Manage EMI status
-
-### Financial Suggestions
-- Get purchase recommendations
-- Analyze financial impact
-- View suggestion history
-- Save planned purchases
-
-### Reports
-- Generate monthly financial reports
-- Export reports as PDF
-- Share financial summaries
-- View detailed analytics
-
-## 🔒 Security
-
-- **Input validation** on all API endpoints
-- **Error handling** with proper HTTP status codes
-- **Data sanitization** before database operations
-- **Environment variable** protection
-
-## 🚀 Deployment
-
-### Vercel (Recommended)
+### Deployment on Vercel
 1. Connect your GitHub repository to Vercel
-2. Set environment variables in Vercel dashboard
-3. Deploy automatically on push
+2. Add environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
 
-### Other Platforms
-- Set `MONGODB_URI` environment variable
-- Build: `npm run build`
-- Start: `npm start`
+## 📊 Dashboard Details
 
-## 🤝 Contributing
+### Financial Metrics Calculation
+- **Total Income**: Sum of all income entries for the current month
+- **Total Expenses**: Sum of all expenses for the current month
+- **Net Savings**: Income minus expenses
+- **Financial Health Score**: Algorithm based on savings ratio and expense patterns
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+### Chart Rendering
+- **Monthly Trends**: Line charts showing income vs expenses over time
+- **Category Breakdown**: Pie charts displaying expense distribution
+- **Spending Trends**: Bar charts for monthly comparison
+- **Real-time Updates**: Charts update automatically when data changes
 
-## 📄 License
+### Chart.js Integration
+- Responsive chart containers
+- Custom color schemes matching app theme
+- Interactive tooltips and legends
+- Smooth animations and transitions
 
-This project is licensed under the MIT License.
+## 💡 Suggestions Logic
 
-## 🆘 Support
+### Financial Health Scoring
+```typescript
+// Basic scoring algorithm
+const monthlyIncome = calculateTotalIncome();
+const monthlyExpenses = calculateTotalExpenses();
+const existingEMIs = calculateActiveEMIs();
+const savings = user.savings;
 
-For support and questions:
-- Create an issue in the repository
-- Check the documentation
-- Review the code comments
+const availableBudget = monthlyIncome - monthlyExpenses - existingEMIs;
+const affordabilityScore = (availableBudget / monthlyIncome) * 100;
+```
+
+### Product Recommendation Criteria
+- **Affordability**: Monthly payment vs available budget
+- **Savings Impact**: Effect on current savings
+- **Financial Health**: Impact on overall financial score
+- **Risk Assessment**: Based on income stability and existing commitments
+
+### Manual Product Analysis
+- Users can add custom products for analysis
+- System calculates affordability and provides recommendations
+- Shows detailed breakdown of financial impact
+
+## 🔒 Auth Flow
+
+### Authentication Process
+1. **User Login**: Firebase authentication with Google or email
+2. **Auth State Check**: `onAuthStateChanged` monitors login status
+3. **User Initialization**: Check if user exists in database
+4. **Profile Setup**: New users complete profile setup
+5. **Data Loading**: Load user's financial data from MongoDB
+
+### New User Flow
+```typescript
+// Authentication flow
+authUser → checkUserExists → createUser → profileSetup → loadData
+```
+
+### Session Management
+- Persistent login state across browser sessions
+- Automatic data synchronization on login
+- Secure token-based authentication
+
+## 🎨 UI Theme
+
+### Design System
+- **Primary Font**: Lexend (clean, modern typography)
+- **Color Palette**: 
+  - Background: `#1C1C1E` (dark theme)
+  - Primary: `#F70000` (red accent)
+  - Secondary: `#2C2C2E` (card backgrounds)
+  - Text: `#FFFFFF` (white text)
+- **Responsive Breakpoints**: Mobile-first design
+- **Component Styling**: Tailwind CSS utility classes
+
+### Visual Elements
+- **Icons**: Heroicons for consistent iconography
+- **Charts**: Custom-styled Chart.js components
+- **Animations**: Smooth transitions and hover effects
+- **Layout**: Grid and Flexbox for responsive design
+
+## 📁 Folder Structure
+
+```
+budgetly/
+├── src/
+│   ├── app/
+│   │   ├── api/                 # API routes
+│   │   │   ├── expenses/
+│   │   │   ├── income/
+│   │   │   ├── profile/
+│   │   │   ├── suggestions/
+│   │   │   └── user/
+│   │   ├── favicon.ico
+│   │   ├── firebase.ts         # Firebase configuration
+│   │   ├── globals.css         # Global styles
+│   │   ├── layout.tsx          # Root layout
+│   │   └── page.tsx            # Home page
+│   ├── components/             # React components
+│   │   ├── Dashboard.tsx
+│   │   ├── EMIManager.tsx
+│   │   ├── ExpenseManager.tsx
+│   │   ├── Header.tsx
+│   │   ├── IncomeManager.tsx
+│   │   ├── Layout.tsx
+│   │   ├── ReportsManager.tsx
+│   │   ├── SavingsManager.tsx
+│   │   ├── Sidebar.tsx
+│   │   ├── SuggestionsManager.tsx
+│   │   └── WelcomeMessage.tsx
+│   ├── context/                # React context
+│   │   └── DataContext.tsx
+│   └── services/               # API services
+│       └── api.ts
+├── models/                     # MongoDB models
+│   └── User.ts
+├── lib/                        # Utility libraries
+│   └── mongoose.ts
+├── public/                     # Static assets
+├── package.json
+├── next.config.ts
+├── tailwind.config.js
+└── tsconfig.json
+```
+
+## 📅 Future Improvements
+
+### Planned Features
+- **Budget Planning**: Set monthly budgets with alerts
+- **Bill Reminders**: Automated payment reminders
+- **Investment Tracking**: Portfolio management and tracking
+- **Tax Planning**: Tax calculation and optimization
+- **Export Options**: CSV, Excel export functionality
+- **Mobile App**: React Native mobile application
+- **Multi-currency**: Support for multiple currencies
+- **Family Accounts**: Shared family finance management
+
+### Technical Enhancements
+- **Real-time Sync**: WebSocket integration for live updates
+- **Offline Support**: PWA capabilities for offline usage
+- **Advanced Analytics**: Machine learning for spending insights
+- **API Rate Limiting**: Enhanced security and performance
+- **Caching Strategy**: Redis integration for better performance
+- **Testing Suite**: Comprehensive unit and integration tests
+
+### User Experience
+- **Dark/Light Theme**: User preference toggle
+- **Custom Categories**: User-defined expense categories
+- **Goal Setting**: Financial goal tracking and visualization
+- **Notifications**: Push notifications for important events
+- **Data Import**: Bulk import from bank statements
 
 ---
 
-**Built with ❤️ using Next.js, MongoDB, and React**
+**Budgetly** - Take control of your financial future, one transaction at a time. 💰✨
