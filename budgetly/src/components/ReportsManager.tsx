@@ -14,6 +14,7 @@ import {
     Tooltip,
     Legend,
     ArcElement,
+    TooltipItem
 } from 'chart.js';
 import { Bar, Pie } from 'react-chartjs-2';
 import {
@@ -472,8 +473,8 @@ export default function ReportsManager() {
                 borderWidth: 1,
                 cornerRadius: 8,
                 callbacks: {
-                    label: function (context: { label: string; parsed: number }) {
-                        return `${context.label}: $${context.parsed.toLocaleString()}`;
+                    label: function (context: TooltipItem<'bar'>) {
+                        return `${context.label}: $${context.parsed.y?.toLocaleString() ?? 0}`;
                     },
                 },
             },
