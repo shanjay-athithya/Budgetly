@@ -320,7 +320,7 @@ export default function SuggestionsManager() {
             case 'moderate':
                 return { icon: ExclamationTriangleIcon, color: 'text-yellow-400', bgColor: 'bg-yellow-500/20' };
             case 'risky':
-                return { icon: XCircleIcon, color: 'text-red-400', bgColor: 'bg-red-500/20' };
+                return { icon: XCircleIcon, color: 'text-[#F70000]', bgColor: 'bg-[#F70000]/20' };
             default:
                 return { icon: CheckCircleIcon, color: 'text-gray-400', bgColor: 'bg-gray-500/20' };
         }
@@ -385,7 +385,7 @@ export default function SuggestionsManager() {
                     <div
                         key={toast.id}
                         className={`px-4 py-3 rounded-lg shadow-lg text-white font-medium transition-all duration-300 ${toast.type === 'success' ? 'bg-green-500' :
-                            toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                            toast.type === 'error' ? 'bg-[#F70000]' : 'bg-blue-500'
                             }`}
                     >
                         {toast.message}
@@ -429,8 +429,8 @@ export default function SuggestionsManager() {
 
                 <div className="bg-[#383838] rounded-xl p-4 border border-gray-600">
                     <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-                            <CurrencyDollarIcon className="w-5 h-5 text-red-400" />
+                        <div className="w-10 h-10 bg-[#F70000]/20 rounded-lg flex items-center justify-center">
+                            <CurrencyDollarIcon className="w-5 h-5 text-[#F70000]" />
                         </div>
                         <div>
                             <p className="text-gray-400 text-sm">Monthly Expenses</p>

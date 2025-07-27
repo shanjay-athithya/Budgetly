@@ -40,8 +40,8 @@ export default function Login() {
                     </div>
 
                     {error && (
-                        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-                            <p className="text-red-400 text-sm">{error}</p>
+                        <div className="mb-6 p-4 bg-[#F70000]/10 border border-[#F70000]/20 rounded-lg">
+                            <p className="text-[#F70000] text-sm">{error}</p>
                         </div>
                     )}
 

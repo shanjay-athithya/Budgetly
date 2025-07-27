@@ -580,7 +580,7 @@ export default function ReportsManager() {
                     <div
                         key={toast.id}
                         className={`px-4 py-3 rounded-lg shadow-lg text-white font-medium transition-all duration-300 ${toast.type === 'success' ? 'bg-green-500' :
-                            toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                            toast.type === 'error' ? 'bg-[#F70000]' : 'bg-blue-500'
                             }`}
                     >
                         {toast.message}
@@ -668,7 +668,7 @@ export default function ReportsManager() {
                         </div>
                         <div>
                             <h3 className="text-gray-400 text-sm font-medium">Net Savings</h3>
-                            <p className={`text-3xl font-bold ${currentReport.savings >= 0 ? 'text-white' : 'text-red-400'}`}>
+                            <p className={`text-3xl font-bold ${currentReport.savings >= 0 ? 'text-white' : 'text-[#F70000]'}`}>
                                 ₹{currentReport.savings.toLocaleString()}
                             </p>
                         </div>
@@ -754,7 +754,7 @@ export default function ReportsManager() {
                     </div>
                     <div className="bg-[#232326] rounded-xl p-4">
                         <p className="text-gray-400 text-sm">Expense Ratio</p>
-                        <p className="text-2xl font-bold text-red-400">
+                        <p className="text-2xl font-bold text-[#F70000]">
                             {currentReport.totalIncome > 0
                                 ? ((currentReport.totalExpenses / currentReport.totalIncome) * 100).toFixed(1)
                                 : 0}%

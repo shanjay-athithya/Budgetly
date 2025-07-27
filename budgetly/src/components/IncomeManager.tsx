@@ -356,7 +356,7 @@ export default function IncomeManager() {
                                         </button>
                                         <button
                                             onClick={() => handleDelete(income)}
-                                            className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                            className="p-2 text-gray-400 hover:text-[#F70000] hover:bg-[#F70000]/10 rounded-lg transition-colors"
                                         >
                                             <TrashIcon className="h-4 w-4" />
                                         </button>
@@ -466,7 +466,7 @@ export default function IncomeManager() {
                     <div
                         key={toast.id}
                         className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' :
-                            toast.type === 'error' ? 'bg-red-500 text-white' :
+                            toast.type === 'error' ? 'bg-[#F70000] text-white' :
                                 'bg-blue-500 text-white'
                             }`}
                     >

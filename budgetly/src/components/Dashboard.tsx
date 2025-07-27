@@ -327,9 +327,9 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-gray-400 text-sm">Total Expenses</p>
-                            <p className="text-2xl font-bold text-red-400">₹{metrics.totalExpenses.toLocaleString()}</p>
+                            <p className="text-2xl font-bold text-[#F70000]">₹{metrics.totalExpenses.toLocaleString()}</p>
                         </div>
-                        <CreditCardIcon className="h-8 w-8 text-red-400" />
+                        <CreditCardIcon className="h-8 w-8 text-[#F70000]" />
                     </div>
                 </div>
 
@@ -337,7 +337,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-gray-400 text-sm">Current Savings</p>
-                            <p className={`text-2xl font-bold ${metrics.currentSavings >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                            <p className={`text-2xl font-bold ${metrics.currentSavings >= 0 ? 'text-blue-400' : 'text-[#F70000]'}`}>
                                 ₹{metrics.currentSavings.toLocaleString()}
                             </p>
                         </div>
@@ -457,17 +457,17 @@ export default function Dashboard() {
                                     key={index}
                                     className={`flex items-center space-x-3 p-3 rounded-lg ${alert.type === 'success' ? 'bg-green-500/10 border border-green-500/20' :
                                         alert.type === 'warning' ? 'bg-yellow-500/10 border border-yellow-500/20' :
-                                            'bg-red-500/10 border border-red-500/20'
+                                            'bg-[#F70000]/10 border border-[#F70000]/20'
                                         }`}
                                 >
                                     <Icon className={`h-5 w-5 ${alert.type === 'success' ? 'text-green-400' :
                                         alert.type === 'warning' ? 'text-yellow-400' :
-                                            'text-red-400'
+                                            'text-[#F70000]'
                                         }`} />
                                     <div>
                                         <p className={`font-medium ${alert.type === 'success' ? 'text-green-400' :
                                             alert.type === 'warning' ? 'text-yellow-400' :
-                                                'text-red-400'
+                                                'text-[#F70000]'
                                             }`}>
                                             {alert.title}
                                         </p>
@@ -486,7 +486,7 @@ export default function Dashboard() {
                     <div
                         key={toast.id}
                         className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' :
-                            toast.type === 'error' ? 'bg-red-500 text-white' :
+                            toast.type === 'error' ? 'bg-[#F70000] text-white' :
                                 toast.type === 'warning' ? 'bg-yellow-500 text-white' :
                                     'bg-blue-500 text-white'
                             }`}

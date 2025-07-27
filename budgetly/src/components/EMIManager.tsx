@@ -373,7 +373,7 @@ export default function EMIManager() {
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(emi)}
-                                                className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+                                                className="p-2 bg-[#F70000]/20 text-[#F70000] rounded-lg hover:bg-[#F70000]/30 transition-colors"
                                                 title="Delete EMI"
                                             >
                                                 <TrashIcon className="h-4 w-4" />
@@ -551,7 +551,7 @@ export default function EMIManager() {
                     <div
                         key={toast.id}
                         className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' :
-                            toast.type === 'error' ? 'bg-red-500 text-white' :
+                            toast.type === 'error' ? 'bg-[#F70000] text-white' :
                                 'bg-blue-500 text-white'
                             }`}
                     >

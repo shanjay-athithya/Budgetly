@@ -289,7 +289,7 @@ export default function ExpenseManager() {
                             <p className="text-gray-400 text-sm">Total Expenses</p>
                             <p className="text-2xl font-bold text-white">₹{totalExpenses.toLocaleString()}</p>
                         </div>
-                        <CreditCardIcon className="h-8 w-8 text-red-400" />
+                        <CreditCardIcon className="h-8 w-8 text-[#F70000]" />
                     </div>
                 </div>
 
@@ -385,8 +385,8 @@ export default function ExpenseManager() {
                             <div key={expense._id || `expense-${index}`} className="p-6">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-4">
-                                        <div className="w-12 h-12 bg-red-500/20 rounded-lg flex items-center justify-center">
-                                            <CreditCardIcon className="h-6 w-6 text-red-400" />
+                                        <div className="w-12 h-12 bg-[#F70000]/20 rounded-lg flex items-center justify-center">
+                                            <CreditCardIcon className="h-6 w-6 text-[#F70000]" />
                                         </div>
                                         <div>
                                             <h3 className="text-white font-medium">{expense.label}</h3>
@@ -414,7 +414,7 @@ export default function ExpenseManager() {
                                         </button>
                                         <button
                                             onClick={() => handleDelete(expense)}
-                                            className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+                                            className="p-2 bg-[#F70000]/20 text-[#F70000] rounded-lg hover:bg-[#F70000]/30 transition-colors"
                                             title="Delete expense"
                                         >
                                             <TrashIcon className="h-4 w-4" />
@@ -573,7 +573,7 @@ export default function ExpenseManager() {
                     <div
                         key={toast.id}
                         className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' :
-                            toast.type === 'error' ? 'bg-red-500 text-white' :
+                            toast.type === 'error' ? 'bg-[#F70000] text-white' :
                                 'bg-blue-500 text-white'
                             }`}
                     >

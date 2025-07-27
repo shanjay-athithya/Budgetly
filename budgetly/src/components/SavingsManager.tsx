@@ -239,7 +239,7 @@ export default function SavingsManager() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-gray-400 text-sm">Total Savings</p>
-                            <p className={`text-2xl font-bold ${currentSavings >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            <p className={`text-2xl font-bold ${currentSavings >= 0 ? 'text-green-400' : 'text-[#F70000]'}`}>
                                 ₹{currentSavings.toLocaleString()}
                             </p>
                         </div>
@@ -251,7 +251,7 @@ export default function SavingsManager() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-gray-400 text-sm">This Month</p>
-                            <p className={`text-2xl font-bold ${currentMonthSavings >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                            <p className={`text-2xl font-bold ${currentMonthSavings >= 0 ? 'text-blue-400' : 'text-[#F70000]'}`}>
                                 ₹{currentMonthSavings.toLocaleString()}
                             </p>
                         </div>
@@ -263,7 +263,7 @@ export default function SavingsManager() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-gray-400 text-sm">Savings Rate</p>
-                            <p className={`text-2xl font-bold ${savingsRate >= 20 ? 'text-green-400' : savingsRate >= 10 ? 'text-yellow-400' : 'text-red-400'}`}>
+                            <p className={`text-2xl font-bold ${savingsRate >= 20 ? 'text-green-400' : savingsRate >= 10 ? 'text-yellow-400' : 'text-[#F70000]'}`}>
                                 {savingsRate.toFixed(1)}%
                             </p>
                         </div>
@@ -318,9 +318,9 @@ export default function SavingsManager() {
                         {savingsHistory.slice(-6).reverse().map((entry) => (
                             <div key={entry.month} className="p-6 flex items-center justify-between">
                                 <div className="flex items-center space-x-4">
-                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${entry.savings >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'
+                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${entry.savings >= 0 ? 'bg-green-500/20' : 'bg-[#F70000]/20'
                                         }`}>
-                                        <BuildingLibraryIcon className={`h-6 w-6 ${entry.savings >= 0 ? 'text-green-400' : 'text-red-400'
+                                        <BuildingLibraryIcon className={`h-6 w-6 ${entry.savings >= 0 ? 'text-green-400' : 'text-[#F70000]'
                                             }`} />
                                     </div>
                                     <div>
@@ -332,7 +332,7 @@ export default function SavingsManager() {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className={`text-xl font-bold ${entry.savings >= 0 ? 'text-green-400' : 'text-red-400'
+                                    <p className={`text-xl font-bold ${entry.savings >= 0 ? 'text-green-400' : 'text-[#F70000]'
                                         }`}>
                                         ₹{entry.savings.toLocaleString()}
                                     </p>
@@ -395,7 +395,7 @@ export default function SavingsManager() {
                     <div
                         key={toast.id}
                         className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' :
-                            toast.type === 'error' ? 'bg-red-500 text-white' :
+                            toast.type === 'error' ? 'bg-[#F70000] text-white' :
                                 'bg-blue-500 text-white'
                             }`}
                     >
