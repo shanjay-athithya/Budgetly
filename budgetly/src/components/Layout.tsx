@@ -1,54 +1,71 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
 import IncomeManager from './IncomeManager';
 import ExpenseManager from './ExpenseManager';
 import SavingsManager from './SavingsManager';
 import EMIManager from './EMIManager';
-import ReportsManager from './ReportsManager';
 import SuggestionsManager from './SuggestionsManager';
-import { Bars3Icon } from '@heroicons/react/24/outline';
+import ReportsManager from './ReportsManager';
+import WelcomeMessage from './WelcomeMessage';
+import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 
-interface LayoutProps {
-    children?: React.ReactNode;
-}
+export default function Layout() {
+    const { user: authUser } = useAuth();
+    const { state } = useData();
+    const { user: dbUser } = state;
 
-export default function Layout({ children }: LayoutProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [currentSection, setCurrentSection] = useState('dashboard');
+    const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
 
-    const handleNavigate = (section: string) => {
+    // Check if this is a new user (first time login)
+    useEffect(() => {
+        if (dbUser && dbUser.createdAt) {
+            const userCreatedAt = new Date(dbUser.createdAt);
+            const now = new Date();
+            const timeDiff = now.getTime() - userCreatedAt.getTime();
+            const minutesDiff = timeDiff / (1000 * 60);
+
+            // Show welcome message if user was created in the last 5 minutes
+            if (minutesDiff < 5) {
+                setShowWelcomeMessage(true);
+            }
+        }
+    }, [dbUser]);
+
+    // Memoize the navigation handler to prevent infinite loops
+    const handleNavigate = useCallback((section: string) => {
         setCurrentSection(section);
-        // Here you would typically handle navigation logic
-        console.log(`Navigating to: ${section}`);
-    };
+    }, []);
 
-    const getSectionTitle = (section: string) => {
+    const getSectionTitle = () => {
         const titles: { [key: string]: string } = {
             dashboard: 'Dashboard',
-            income: 'Income Management',
-            expenses: 'Expense Tracking',
-            savings: 'Savings Goals',
-            emis: 'EMI Management',
+            income: 'Income Manager',
+            expenses: 'Expense Manager',
+            savings: 'Savings Overview',
+            emis: 'EMI Tracker',
             suggestions: 'Financial Suggestions',
-            reports: 'Financial Reports'
+            reports: 'Reports & History'
         };
-        return titles[section] || 'Dashboard';
+        return titles[currentSection] || 'Dashboard';
     };
 
-    const getSectionDescription = (section: string) => {
+    const getSectionDescription = () => {
         const descriptions: { [key: string]: string } = {
-            dashboard: 'Overview of your financial health and key metrics',
-            income: 'Track and manage your income sources',
-            expenses: 'Monitor and categorize your expenses',
-            savings: 'Set and track your savings goals',
-            emis: 'Manage your loan EMIs and payments',
+            dashboard: 'Track your financial overview and key metrics',
+            income: 'Manage and track your income sources',
+            expenses: 'Record and categorize your expenses',
+            savings: 'Monitor your savings progress and goals',
+            emis: 'Track your EMI payments and schedules',
             suggestions: 'Get personalized financial advice',
-            reports: 'Detailed financial analysis and reports'
+            reports: 'View detailed financial reports and history'
         };
-        return descriptions[section] || 'Overview of your financial health and key metrics';
+        return descriptions[currentSection] || 'Track your financial overview and key metrics';
     };
 
     const renderSectionContent = () => {
@@ -73,7 +90,7 @@ export default function Layout({ children }: LayoutProps) {
     };
 
     return (
-        <div className="min-h-screen bg-[#1C1C1E] flex">
+        <div className="flex h-screen bg-[#1C1C1E]">
             {/* Sidebar */}
             <Sidebar
                 open={sidebarOpen}
@@ -82,46 +99,65 @@ export default function Layout({ children }: LayoutProps) {
                 currentSection={currentSection}
             />
 
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col">
-                {/* Mobile Header */}
-                <header className="lg:hidden bg-[#232326] border-b border-gray-700 p-4">
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Header */}
+                <header className="bg-[#232326] border-b border-gray-600 px-6 py-4">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-[#F70000] rounded-lg flex items-center justify-center">
-                                <span className="text-white font-bold text-lg">B</span>
+                        <div className="flex items-center space-x-4">
+                            <button
+                                onClick={() => setSidebarOpen(true)}
+                                className="lg:hidden p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-lg"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            </button>
+                            <div>
+                                <h1 className="text-xl font-bold text-white">{getSectionTitle()}</h1>
+                                <p className="text-gray-400 text-sm">{getSectionDescription()}</p>
                             </div>
-                            <span className="text-xl font-bold text-white">Budgetly</span>
                         </div>
-                        <button
-                            onClick={() => setSidebarOpen(true)}
-                            className="p-2 rounded-lg hover:bg-[#383838] text-gray-400 hover:text-white transition-colors"
-                        >
-                            <Bars3Icon className="w-6 h-6" />
-                        </button>
+
+                        {/* User Info */}
+                        {authUser && (
+                            <div className="flex items-center space-x-3">
+                                <div className="text-right">
+                                    <p className="text-white font-medium text-sm">{authUser.displayName || 'User'}</p>
+                                    <p className="text-gray-400 text-xs">{authUser.email}</p>
+                                </div>
+                                {authUser.photoURL ? (
+                                    <img
+                                        src={authUser.photoURL}
+                                        alt={authUser.displayName || 'User'}
+                                        className="w-8 h-8 rounded-full"
+                                    />
+                                ) : (
+                                    <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
+                                        <span className="text-white text-sm font-medium">
+                                            {authUser.displayName?.charAt(0) || 'U'}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </header>
 
-                {/* Content */}
-                <main className="flex-1 overflow-auto p-6">
-                    <div className="max-w-7xl mx-auto">
-                        {/* Page Header */}
-                        <div className="mb-8">
-                            <h1 className="text-3xl font-bold text-white mb-2">
-                                {getSectionTitle(currentSection)}
-                            </h1>
-                            <p className="text-gray-400">
-                                {getSectionDescription(currentSection)}
-                            </p>
-                        </div>
-
-                        {/* Content Area */}
-                        <div className="bg-[#232326] rounded-2xl shadow-xl p-6 border border-gray-700">
-                            {renderSectionContent()}
-                        </div>
-                    </div>
+                {/* Content Area */}
+                <main className="flex-1 overflow-y-auto p-6">
+                    {renderSectionContent()}
                 </main>
             </div>
+
+            {/* Welcome Message for New Users */}
+            {showWelcomeMessage && dbUser && (
+                <WelcomeMessage
+                    userName={dbUser.name}
+                    savingsAmount={dbUser.savings}
+                    onDismiss={() => setShowWelcomeMessage(false)}
+                />
+            )}
         </div>
     );
 } 

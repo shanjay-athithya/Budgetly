@@ -9,18 +9,14 @@ import {
     CalendarIcon,
     BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
+import { useData } from '../context/DataContext';
+import { utils } from '../services/api';
 
 interface IncomeEntry {
     id: string;
-    date: string; // YYYY-MM format
+    date: string;
     source: string;
     amount: number;
-}
-
-interface IncomeManagerProps {
-    incomes?: IncomeEntry[];
-    onSave?: (income: IncomeEntry) => Promise<void>;
-    onDelete?: (id: string) => Promise<void>;
 }
 
 interface Toast {
@@ -29,25 +25,41 @@ interface Toast {
     type: 'success' | 'error' | 'info';
 }
 
-export default function IncomeManager({ incomes = [], onSave, onDelete }: IncomeManagerProps) {
-    const [localIncomes, setLocalIncomes] = useState<IncomeEntry[]>(incomes);
+export default function IncomeManager() {
+    const { state, addIncome, updateIncome } = useData();
+    const { user, currentMonth, loading, error } = state;
+
+    const [localIncomes, setLocalIncomes] = useState<IncomeEntry[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [editingIncome, setEditingIncome] = useState<IncomeEntry | null>(null);
     const [toasts, setToasts] = useState<Toast[]>([]);
-    const [loading, setLoading] = useState(false);
-
-    // Form state
     const [formData, setFormData] = useState({
         date: '',
         source: '',
         amount: ''
     });
 
+    // Load incomes for current month
+    useEffect(() => {
+        if (user && currentMonth && user.months) {
+            const monthData = user.months[currentMonth];
+            if (monthData && monthData.income > 0) {
+                // Convert to income entries format
+                setLocalIncomes([{
+                    id: 'current-income',
+                    date: currentMonth,
+                    source: 'Salary', // Default source
+                    amount: monthData.income
+                }]);
+            } else {
+                setLocalIncomes([]);
+            }
+        }
+    }, [user, currentMonth]);
+
     // Calculate totals
     const totalIncome = localIncomes.reduce((sum, income) => sum + income.amount, 0);
-    const currentMonthIncome = localIncomes
-        .filter(income => income.date === new Date().toISOString().slice(0, 7))
-        .reduce((sum, income) => sum + income.amount, 0);
+    const currentMonthIncome = localIncomes.find(income => income.date === currentMonth)?.amount || 0;
 
     // Toast management
     const addToast = (message: string, type: Toast['type']) => {
@@ -65,17 +77,17 @@ export default function IncomeManager({ incomes = [], onSave, onDelete }: Income
     };
 
     const resetForm = () => {
-        setFormData({ date: '', source: '', amount: '' });
+        setFormData({
+            date: '',
+            source: '',
+            amount: ''
+        });
         setEditingIncome(null);
     };
 
     const openAddModal = () => {
         resetForm();
-        setFormData({
-            date: new Date().toISOString().slice(0, 7),
-            source: '',
-            amount: ''
-        });
+        setFormData(prev => ({ ...prev, date: currentMonth }));
         setShowModal(true);
     };
 
@@ -94,12 +106,11 @@ export default function IncomeManager({ incomes = [], onSave, onDelete }: Income
         resetForm();
     };
 
-    // Save handler
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.date || !formData.source || !formData.amount) {
-            addToast('Please fill in all fields', 'error');
+        if (!user) {
+            addToast('User not found', 'error');
             return;
         }
 
@@ -109,202 +120,180 @@ export default function IncomeManager({ incomes = [], onSave, onDelete }: Income
             return;
         }
 
-        setLoading(true);
         try {
-            const incomeData: IncomeEntry = {
-                id: editingIncome?.id || Date.now().toString(),
-                date: formData.date,
-                source: formData.source,
-                amount: amount
-            };
-
-            if (onSave) {
-                await onSave(incomeData);
+            if (editingIncome) {
+                // Update existing income - replace the total amount
+                await updateIncome(user.uid, formData.date, amount);
+                addToast('Income updated successfully', 'success');
             } else {
-                // Local state management if no backend
-                if (editingIncome) {
-                    setLocalIncomes(prev =>
-                        prev.map(income =>
-                            income.id === editingIncome.id ? incomeData : income
-                        )
-                    );
-                } else {
-                    setLocalIncomes(prev => [...prev, incomeData]);
-                }
+                // Add new income - add to existing amount
+                const currentIncome = user.months[formData.date]?.income || 0;
+                const newTotal = currentIncome + amount;
+                await updateIncome(user.uid, formData.date, newTotal);
+                addToast(`Income added successfully! Total: ₹${newTotal.toLocaleString()}`, 'success');
             }
 
-            addToast(
-                editingIncome
-                    ? 'Income updated successfully!'
-                    : 'Income added successfully!',
-                'success'
-            );
             closeModal();
-        } catch (error) {
-            addToast('Failed to save income. Please try again.', 'error');
-        } finally {
-            setLoading(false);
+        } catch (error: any) {
+            addToast(error.message || 'Failed to save income', 'error');
         }
     };
 
-    // Delete handler
-    const handleDelete = async (id: string) => {
-        if (!window.confirm('Are you sure you want to delete this income entry?')) {
+    const handleDelete = async (income: IncomeEntry) => {
+        if (!user) {
+            addToast('User not found', 'error');
             return;
         }
 
-        setLoading(true);
         try {
-            if (onDelete) {
-                await onDelete(id);
-            } else {
-                // Local state management if no backend
-                setLocalIncomes(prev => prev.filter(income => income.id !== id));
-            }
-            addToast('Income deleted successfully!', 'success');
-        } catch (error) {
-            addToast('Failed to delete income. Please try again.', 'error');
-        } finally {
-            setLoading(false);
+            // Set income to 0 (delete)
+            await updateIncome(user.uid, income.date, 0);
+            addToast('Income deleted successfully', 'success');
+        } catch (error: any) {
+            addToast(error.message || 'Failed to delete income', 'error');
         }
     };
 
-    // Format date for display
-    const formatDate = (dateString: string) => {
-        const [year, month] = dateString.split('-');
-        return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long'
-        });
-    };
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#F70000]"></div>
+            </div>
+        );
+    }
 
-    // Sort incomes by date (newest first)
-    const sortedIncomes = [...localIncomes].sort((a, b) => b.date.localeCompare(a.date));
+    if (error) {
+        return (
+            <div className="text-center py-8">
+                <div className="text-red-500 mb-4">
+                    <CurrencyDollarIcon className="h-12 w-12 mx-auto" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">Error Loading Income Data</h3>
+                <p className="text-gray-400">{error}</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
-            {/* Toast Notifications */}
-            <div className="fixed top-4 right-4 z-50 space-y-2">
-                {toasts.map(toast => (
-                    <div
-                        key={toast.id}
-                        className={`px-4 py-3 rounded-lg shadow-lg text-white font-medium transition-all duration-300 ${toast.type === 'success' ? 'bg-green-500' :
-                            toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
-                            }`}
-                    >
-                        {toast.message}
-                    </div>
-                ))}
-            </div>
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 rounded-2xl p-6 border border-green-500/20 shadow-xl">
-                    <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center">
-                            <CurrencyDollarIcon className="w-6 h-6 text-green-400" />
-                        </div>
-                        <div>
-                            <h3 className="text-gray-400 text-sm font-medium">Total Income</h3>
-                            <p className="text-3xl font-bold text-white">${totalIncome.toLocaleString()}</p>
-                        </div>
-                    </div>
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-white">Income Manager</h1>
+                    <p className="text-gray-400">Track and manage your income sources</p>
                 </div>
-
-                <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 rounded-2xl p-6 border border-blue-500/20 shadow-xl">
-                    <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                            <CalendarIcon className="w-6 h-6 text-blue-400" />
-                        </div>
-                        <div>
-                            <h3 className="text-gray-400 text-sm font-medium">This Month</h3>
-                            <p className="text-3xl font-bold text-white">${currentMonthIncome.toLocaleString()}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Header with Add Button */}
-            <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-white">Income History</h2>
                 <button
                     onClick={openAddModal}
-                    className="flex items-center space-x-2 bg-[#F70000] hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 shadow-lg"
+                    className="flex items-center space-x-2 bg-[#F70000] hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
                 >
-                    <PlusIcon className="w-5 h-5" />
+                    <PlusIcon className="h-5 w-5" />
                     <span>Add Income</span>
                 </button>
             </div>
 
-            {/* Income Table */}
-            <div className="bg-[#383838] rounded-2xl border border-gray-600 shadow-xl overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead className="bg-[#232326] border-b border-gray-600">
-                            <tr>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Date</th>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Source</th>
-                                <th className="px-6 py-4 text-right text-sm font-medium text-gray-300">Amount</th>
-                                <th className="px-6 py-4 text-center text-sm font-medium text-gray-300">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-600">
-                            {sortedIncomes.length === 0 ? (
-                                <tr>
-                                    <td colSpan={4} className="px-6 py-8 text-center text-gray-400">
-                                        <BuildingOfficeIcon className="w-12 h-12 mx-auto mb-4 text-gray-500" />
-                                        <p className="text-lg font-medium">No income entries yet</p>
-                                        <p className="text-sm">Add your first income entry to get started</p>
-                                    </td>
-                                </tr>
-                            ) : (
-                                sortedIncomes.map((income) => (
-                                    <tr key={income.id} className="hover:bg-[#232326] transition-colors">
-                                        <td className="px-6 py-4 text-white font-medium">
-                                            {formatDate(income.date)}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-300">
-                                            {income.source}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-green-400 font-bold">
-                                            ${income.amount.toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="flex items-center justify-center space-x-2">
-                                                <button
-                                                    onClick={() => openEditModal(income)}
-                                                    className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors"
-                                                    title="Edit"
-                                                >
-                                                    <PencilIcon className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(income.id)}
-                                                    className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-                                                    title="Delete"
-                                                >
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-[#232326] rounded-xl p-6 border border-gray-600">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-gray-400 text-sm">Total Income</p>
+                            <p className="text-2xl font-bold text-green-400">₹{totalIncome.toLocaleString()}</p>
+                        </div>
+                        <CurrencyDollarIcon className="h-8 w-8 text-green-400" />
+                    </div>
                 </div>
+
+                <div className="bg-[#232326] rounded-xl p-6 border border-gray-600">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-gray-400 text-sm">Current Month</p>
+                            <p className="text-2xl font-bold text-blue-400">₹{currentMonthIncome.toLocaleString()}</p>
+                        </div>
+                        <CalendarIcon className="h-8 w-8 text-blue-400" />
+                    </div>
+                </div>
+
+                <div className="bg-[#232326] rounded-xl p-6 border border-gray-600">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-gray-400 text-sm">Income Sources</p>
+                            <p className="text-2xl font-bold text-purple-400">{localIncomes.length}</p>
+                        </div>
+                        <BuildingOfficeIcon className="h-8 w-8 text-purple-400" />
+                    </div>
+                </div>
+            </div>
+
+            {/* Income List */}
+            <div className="bg-[#232326] rounded-xl border border-gray-600">
+                <div className="p-6 border-b border-gray-600">
+                    <h2 className="text-lg font-semibold text-white">Income Sources</h2>
+                </div>
+
+                {localIncomes.length === 0 ? (
+                    <div className="p-8 text-center">
+                        <CurrencyDollarIcon className="h-16 w-16 text-gray-500 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-400 mb-2">No Income Recorded</h3>
+                        <p className="text-gray-500 mb-4">Start by adding your income sources for this month</p>
+                        <button
+                            onClick={openAddModal}
+                            className="bg-[#F70000] hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+                        >
+                            Add First Income
+                        </button>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-gray-600">
+                        {localIncomes.map((income) => (
+                            <div key={income.id} className="p-6 flex items-center justify-between">
+                                <div className="flex items-center space-x-4">
+                                    <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                                        <CurrencyDollarIcon className="h-6 w-6 text-green-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-medium">{income.source}</h3>
+                                        <p className="text-gray-400 text-sm">
+                                            {new Date(income.date + '-01').toLocaleDateString('en-US', {
+                                                month: 'long',
+                                                year: 'numeric'
+                                            })}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                    <span className="text-xl font-bold text-green-400">
+                                        ₹{income.amount.toLocaleString()}
+                                    </span>
+                                    <div className="flex space-x-2">
+                                        <button
+                                            onClick={() => openEditModal(income)}
+                                            className="p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-lg transition-colors"
+                                        >
+                                            <PencilIcon className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(income)}
+                                            className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                        >
+                                            <TrashIcon className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Add/Edit Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-                    <div className="bg-[#232326] rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4">
-                        <h3 className="text-2xl font-bold text-white mb-6">
-                            {editingIncome ? 'Edit Income' : 'Add New Income'}
-                        </h3>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-[#232326] rounded-xl p-6 w-full max-w-md mx-4 border border-gray-600">
+                        <h2 className="text-xl font-bold text-white mb-4">
+                            {editingIncome ? 'Edit Income' : 'Add Income'}
+                        </h2>
 
-                        <form onSubmit={handleSave} className="space-y-6">
-                            {/* Date Field */}
+                        <form onSubmit={handleSave} className="space-y-4">
                             <div>
                                 <label className="block text-gray-300 text-sm font-medium mb-2">
                                     Month
@@ -314,69 +303,83 @@ export default function IncomeManager({ incomes = [], onSave, onDelete }: Income
                                     name="date"
                                     value={formData.date}
                                     onChange={handleInputChange}
-                                    className="w-full px-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent"
+                                    className="w-full bg-[#1C1C1E] border border-gray-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F70000]"
                                     required
                                 />
                             </div>
 
-                            {/* Source Field */}
                             <div>
                                 <label className="block text-gray-300 text-sm font-medium mb-2">
-                                    Income Source
+                                    Source
                                 </label>
-                                <input
-                                    type="text"
+                                <select
                                     name="source"
                                     value={formData.source}
                                     onChange={handleInputChange}
-                                    placeholder="e.g., Salary, Freelance, Investment"
-                                    className="w-full px-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent placeholder-gray-500"
+                                    className="w-full bg-[#1C1C1E] border border-gray-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F70000]"
                                     required
+                                >
+                                    <option value="">Select source</option>
+                                    <option value="Salary">Salary</option>
+                                    <option value="Freelance">Freelance</option>
+                                    <option value="Business">Business</option>
+                                    <option value="Investment">Investment</option>
+                                    <option value="Rental">Rental Income</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    Amount (₹)
+                                </label>
+                                <input
+                                    type="number"
+                                    name="amount"
+                                    value={formData.amount}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter amount"
+                                    className="w-full bg-[#1C1C1E] border border-gray-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F70000]"
+                                    required
+                                    min="0"
+                                    step="0.01"
                                 />
                             </div>
 
-                            {/* Amount Field */}
-                            <div>
-                                <label className="block text-gray-300 text-sm font-medium mb-2">
-                                    Amount
-                                </label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</span>
-                                    <input
-                                        type="number"
-                                        name="amount"
-                                        value={formData.amount}
-                                        onChange={handleInputChange}
-                                        placeholder="0.00"
-                                        step="0.01"
-                                        min="0"
-                                        className="w-full pl-8 pr-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent placeholder-gray-500"
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex space-x-4 pt-4">
+                            <div className="flex space-x-3 pt-4">
                                 <button
                                     type="button"
                                     onClick={closeModal}
-                                    className="flex-1 px-4 py-3 text-gray-300 bg-[#383838] hover:bg-gray-600 rounded-lg transition-colors duration-200"
+                                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={loading}
-                                    className="flex-1 px-4 py-3 bg-[#F70000] hover:bg-red-700 text-white font-medium rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex-1 bg-[#F70000] hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
                                 >
-                                    {loading ? 'Saving...' : (editingIncome ? 'Update' : 'Add Income')}
+                                    {editingIncome ? 'Update' : 'Add'}
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
+
+            {/* Toast Notifications */}
+            <div className="fixed bottom-4 right-4 space-y-2 z-50">
+                {toasts.map(toast => (
+                    <div
+                        key={toast.id}
+                        className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' :
+                            toast.type === 'error' ? 'bg-red-500 text-white' :
+                                'bg-blue-500 text-white'
+                            }`}
+                    >
+                        {toast.message}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 } 

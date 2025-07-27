@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     PlusIcon,
     PencilIcon,
@@ -9,8 +9,10 @@ import {
     CalendarIcon,
     CheckCircleIcon,
     ClockIcon,
-    XMarkIcon
+    XMarkIcon,
+    CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
+import { useData } from '../context/DataContext';
 
 interface EMIEntry {
     id: string;
@@ -23,20 +25,17 @@ interface EMIEntry {
     isActive: boolean;
 }
 
-interface EMIManagerProps {
-    emis?: EMIEntry[];
-    onSave?: (emi: EMIEntry) => Promise<void>;
-    onDelete?: (id: string) => Promise<void>;
-}
-
 interface Toast {
     id: string;
     message: string;
     type: 'success' | 'error' | 'info';
 }
 
-export default function EMIManager({ emis = [], onSave, onDelete }: EMIManagerProps) {
-    const [localEMIs, setLocalEMIs] = useState<EMIEntry[]>(emis);
+export default function EMIManager() {
+    const { state } = useData();
+    const { user, currentMonth } = state;
+
+    const [localEMIs, setLocalEMIs] = useState<EMIEntry[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [editingEMI, setEditingEMI] = useState<EMIEntry | null>(null);
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -50,8 +49,34 @@ export default function EMIManager({ emis = [], onSave, onDelete }: EMIManagerPr
         startMonth: ''
     });
 
+    // Load EMIs from user data
+    useEffect(() => {
+        if (user && user.months) {
+            const allEMIs: EMIEntry[] = [];
+
+            Object.entries(user.months).forEach(([month, monthData]) => {
+                monthData.expenses.forEach(expense => {
+                    if (expense.type === 'emi' && expense.emiDetails) {
+                        allEMIs.push({
+                            id: expense._id || Math.random().toString(),
+                            productName: expense.label,
+                            totalAmount: expense.amount,
+                            duration: expense.emiDetails.duration,
+                            startMonth: expense.emiDetails.startedOn.toString().slice(0, 7),
+                            monthlyInstallment: expense.emiDetails.monthlyAmount,
+                            paidMonths: expense.emiDetails.duration - expense.emiDetails.remainingMonths,
+                            isActive: expense.emiDetails.remainingMonths > 0
+                        });
+                    }
+                });
+            });
+
+            setLocalEMIs(allEMIs);
+        }
+    }, [user]);
+
     // Calculate EMI details
-    const calculateEMIDetails = (emi: EMIEntry) => {
+    const calculateEMIDetails = useCallback((emi: EMIEntry) => {
         const startDate = new Date(emi.startMonth + '-01');
         const endDate = new Date(startDate);
         endDate.setMonth(endDate.getMonth() + emi.duration - 1);
@@ -64,7 +89,7 @@ export default function EMIManager({ emis = [], onSave, onDelete }: EMIManagerPr
             remainingMonths,
             progress: (emi.paidMonths / emi.duration) * 100
         };
-    };
+    }, []);
 
     // Separate active and completed EMIs
     const activeEMIs = localEMIs.filter(emi => emi.isActive);
@@ -76,21 +101,21 @@ export default function EMIManager({ emis = [], onSave, onDelete }: EMIManagerPr
     const totalEMIAmount = activeEMIs.reduce((sum, emi) => sum + emi.totalAmount, 0);
 
     // Toast management
-    const addToast = (message: string, type: Toast['type']) => {
+    const addToast = useCallback((message: string, type: Toast['type']) => {
         const id = Date.now().toString();
         setToasts(prev => [...prev, { id, message, type }]);
         setTimeout(() => {
             setToasts(prev => prev.filter(toast => toast.id !== id));
         }, 3000);
-    };
+    }, []);
 
     // Form handlers
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-    };
+    }, []);
 
-    const resetForm = () => {
+    const resetForm = useCallback(() => {
         setFormData({
             productName: '',
             totalAmount: '',
@@ -98,20 +123,14 @@ export default function EMIManager({ emis = [], onSave, onDelete }: EMIManagerPr
             startMonth: ''
         });
         setEditingEMI(null);
-    };
+    }, []);
 
-    const openAddModal = () => {
+    const openAddModal = useCallback(() => {
         resetForm();
-        setFormData({
-            productName: '',
-            totalAmount: '',
-            duration: '',
-            startMonth: new Date().toISOString().slice(0, 7)
-        });
         setShowModal(true);
-    };
+    }, [resetForm]);
 
-    const openEditModal = (emi: EMIEntry) => {
+    const openEditModal = useCallback((emi: EMIEntry) => {
         setEditingEMI(emi);
         setFormData({
             productName: emi.productName,
@@ -120,15 +139,14 @@ export default function EMIManager({ emis = [], onSave, onDelete }: EMIManagerPr
             startMonth: emi.startMonth
         });
         setShowModal(true);
-    };
+    }, []);
 
-    const closeModal = () => {
+    const closeModal = useCallback(() => {
         setShowModal(false);
         resetForm();
-    };
+    }, [resetForm]);
 
-    // Save handler
-    const handleSave = async (e: React.FormEvent) => {
+    const handleSave = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!formData.productName || !formData.totalAmount || !formData.duration || !formData.startMonth) {
@@ -139,442 +157,365 @@ export default function EMIManager({ emis = [], onSave, onDelete }: EMIManagerPr
         const totalAmount = parseFloat(formData.totalAmount);
         const duration = parseInt(formData.duration);
 
-        if (isNaN(totalAmount) || totalAmount <= 0) {
-            addToast('Please enter a valid amount', 'error');
+        if (isNaN(totalAmount) || isNaN(duration) || totalAmount <= 0 || duration <= 0) {
+            addToast('Please enter valid amounts', 'error');
             return;
         }
-
-        if (isNaN(duration) || duration <= 0) {
-            addToast('Please enter a valid duration', 'error');
-            return;
-        }
-
-        const monthlyInstallment = totalAmount / duration;
 
         setLoading(true);
+
         try {
-            const emiData: EMIEntry = {
-                id: editingEMI?.id || Date.now().toString(),
+            const monthlyInstallment = totalAmount / duration;
+            const newEMI: EMIEntry = {
+                id: editingEMI?.id || Math.random().toString(),
                 productName: formData.productName,
-                totalAmount: totalAmount,
-                duration: duration,
+                totalAmount,
+                duration,
                 startMonth: formData.startMonth,
-                monthlyInstallment: monthlyInstallment,
+                monthlyInstallment,
                 paidMonths: editingEMI?.paidMonths || 0,
                 isActive: true
             };
 
-            if (onSave) {
-                await onSave(emiData);
+            if (editingEMI) {
+                // Update existing EMI
+                setLocalEMIs(prev => prev.map(emi =>
+                    emi.id === editingEMI.id ? newEMI : emi
+                ));
+                addToast('EMI updated successfully!', 'success');
             } else {
-                // Local state management if no backend
-                if (editingEMI) {
-                    setLocalEMIs(prev =>
-                        prev.map(emi =>
-                            emi.id === editingEMI.id ? emiData : emi
-                        )
-                    );
-                } else {
-                    setLocalEMIs(prev => [...prev, emiData]);
-                }
+                // Add new EMI
+                setLocalEMIs(prev => [...prev, newEMI]);
+                addToast('EMI added successfully!', 'success');
             }
 
-            addToast(
-                editingEMI
-                    ? 'EMI updated successfully!'
-                    : 'EMI added successfully!',
-                'success'
-            );
             closeModal();
         } catch (error) {
             addToast('Failed to save EMI. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
-    };
+    }, [formData, editingEMI, addToast, closeModal]);
 
-    // Delete handler
-    const handleDelete = async (id: string) => {
-        if (!window.confirm('Are you sure you want to delete this EMI?')) {
+    const handleDelete = useCallback(async (id: string) => {
+        if (!confirm('Are you sure you want to delete this EMI?')) {
             return;
         }
 
         setLoading(true);
+
         try {
-            if (onDelete) {
-                await onDelete(id);
-            } else {
-                // Local state management if no backend
-                setLocalEMIs(prev => prev.filter(emi => emi.id !== id));
-            }
+            setLocalEMIs(prev => prev.filter(emi => emi.id !== id));
             addToast('EMI deleted successfully!', 'success');
         } catch (error) {
             addToast('Failed to delete EMI. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
-    };
+    }, [addToast]);
 
-    // Mark as paid handler
-    const handleMarkAsPaid = (emi: EMIEntry) => {
+    const handleMarkAsPaid = useCallback((emi: EMIEntry) => {
         const updatedEMI = {
             ...emi,
-            paidMonths: emi.paidMonths + 1,
+            paidMonths: Math.min(emi.paidMonths + 1, emi.duration),
             isActive: emi.paidMonths + 1 < emi.duration
         };
 
-        setLocalEMIs(prev =>
-            prev.map(e => e.id === emi.id ? updatedEMI : e)
-        );
+        setLocalEMIs(prev => prev.map(e => e.id === emi.id ? updatedEMI : e));
+        addToast('Payment recorded successfully!', 'success');
+    }, [addToast]);
 
-        addToast(`Marked ${emi.productName} EMI as paid for this month!`, 'success');
-    };
-
-    // Format date for display
-    const formatDate = (dateString: string) => {
-        const [year, month] = dateString.split('-');
-        return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', {
+    const formatDate = useCallback((dateString: string) => {
+        return new Date(dateString + '-01').toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long'
         });
-    };
+    }, []);
 
     return (
-        <div className="space-y-8">
-            {/* Toast Notifications */}
-            <div className="fixed top-4 right-4 z-50 space-y-2">
-                {toasts.map(toast => (
-                    <div
-                        key={toast.id}
-                        className={`px-4 py-3 rounded-lg shadow-lg text-white font-medium transition-all duration-300 ${toast.type === 'success' ? 'bg-green-500' :
-                                toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
-                            }`}
-                    >
-                        {toast.message}
-                    </div>
-                ))}
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-white">EMI Tracker</h1>
+                    <p className="text-gray-400">Manage your loan EMIs and payment schedules</p>
+                </div>
+                <button
+                    onClick={openAddModal}
+                    className="flex items-center space-x-2 bg-[#F70000] hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+                >
+                    <PlusIcon className="h-5 w-5" />
+                    <span>Add EMI</span>
+                </button>
             </div>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-gradient-to-br from-[#F70000]/10 to-[#F70000]/5 rounded-2xl p-6 border border-[#F70000]/20 shadow-xl">
-                    <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-12 h-12 bg-[#F70000]/20 rounded-xl flex items-center justify-center">
-                            <BanknotesIcon className="w-6 h-6 text-[#F70000]" />
-                        </div>
+                <div className="bg-[#232326] rounded-xl p-6 border border-gray-600">
+                    <div className="flex items-center justify-between">
                         <div>
-                            <h3 className="text-gray-400 text-sm font-medium">Active EMIs</h3>
-                            <p className="text-3xl font-bold text-white">{totalActiveEMIs}</p>
+                            <p className="text-gray-400 text-sm">Active EMIs</p>
+                            <p className="text-2xl font-bold text-white">{totalActiveEMIs}</p>
                         </div>
+                        <ClockIcon className="h-8 w-8 text-blue-400" />
                     </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 rounded-2xl p-6 border border-blue-500/20 shadow-xl">
-                    <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                            <CalendarIcon className="w-6 h-6 text-blue-400" />
-                        </div>
+                <div className="bg-[#232326] rounded-xl p-6 border border-gray-600">
+                    <div className="flex items-center justify-between">
                         <div>
-                            <h3 className="text-gray-400 text-sm font-medium">Monthly EMI</h3>
-                            <p className="text-3xl font-bold text-white">${totalMonthlyEMI.toLocaleString()}</p>
+                            <p className="text-gray-400 text-sm">Monthly EMI</p>
+                            <p className="text-2xl font-bold text-white">₹{totalMonthlyEMI.toLocaleString()}</p>
                         </div>
+                        <BanknotesIcon className="h-8 w-8 text-green-400" />
                     </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 rounded-2xl p-6 border border-green-500/20 shadow-xl">
-                    <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center">
-                            <CheckCircleIcon className="w-6 h-6 text-green-400" />
-                        </div>
+                <div className="bg-[#232326] rounded-xl p-6 border border-gray-600">
+                    <div className="flex items-center justify-between">
                         <div>
-                            <h3 className="text-gray-400 text-sm font-medium">Total Amount</h3>
-                            <p className="text-3xl font-bold text-white">${totalEMIAmount.toLocaleString()}</p>
+                            <p className="text-gray-400 text-sm">Total EMI Amount</p>
+                            <p className="text-2xl font-bold text-white">₹{totalEMIAmount.toLocaleString()}</p>
                         </div>
+                        <CurrencyDollarIcon className="h-8 w-8 text-purple-400" />
                     </div>
                 </div>
             </div>
 
-            {/* Active EMIs Section */}
-            <div className="bg-[#383838] rounded-2xl border border-gray-600 shadow-xl overflow-hidden">
-                <div className="p-6 border-b border-gray-600 flex items-center justify-between">
-                    <h2 className="text-2xl font-bold text-white">Active EMIs</h2>
-                    <button
-                        onClick={openAddModal}
-                        className="flex items-center space-x-2 bg-[#F70000] hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 shadow-lg"
-                    >
-                        <PlusIcon className="w-5 h-5" />
-                        <span>Add EMI</span>
-                    </button>
+            {/* Active EMIs */}
+            <div className="bg-[#232326] rounded-xl border border-gray-600">
+                <div className="p-6 border-b border-gray-600">
+                    <h2 className="text-lg font-semibold text-white">Active EMIs</h2>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead className="bg-[#232326] border-b border-gray-600">
-                            <tr>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Product</th>
-                                <th className="px-6 py-4 text-right text-sm font-medium text-gray-300">Total Amount</th>
-                                <th className="px-6 py-4 text-center text-sm font-medium text-gray-300">Progress</th>
-                                <th className="px-6 py-4 text-center text-sm font-medium text-gray-300">Monthly</th>
-                                <th className="px-6 py-4 text-center text-sm font-medium text-gray-300">End Date</th>
-                                <th className="px-6 py-4 text-center text-sm font-medium text-gray-300">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-600">
-                            {activeEMIs.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
-                                        <BanknotesIcon className="w-12 h-12 mx-auto mb-4 text-gray-500" />
-                                        <p className="text-lg font-medium">No active EMIs</p>
-                                        <p className="text-sm">Add your first EMI to get started</p>
-                                    </td>
-                                </tr>
-                            ) : (
-                                activeEMIs.map((emi) => {
-                                    const details = calculateEMIDetails(emi);
-                                    return (
-                                        <tr key={emi.id} className="hover:bg-[#232326] transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div>
-                                                    <p className="text-white font-medium">{emi.productName}</p>
-                                                    <p className="text-gray-400 text-sm">
-                                                        Started {formatDate(emi.startMonth)}
-                                                    </p>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <p className="text-white font-bold">${emi.totalAmount.toLocaleString()}</p>
+                {activeEMIs.length === 0 ? (
+                    <div className="p-8 text-center">
+                        <ClockIcon className="h-16 w-16 text-gray-500 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-400 mb-2">No Active EMIs</h3>
+                        <p className="text-gray-500">Add your first EMI to start tracking payments</p>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-gray-600">
+                        {activeEMIs.map((emi) => {
+                            const details = calculateEMIDetails(emi);
+                            return (
+                                <div key={emi.id} className="p-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center space-x-4">
+                                            <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                                <ClockIcon className="h-6 w-6 text-blue-400" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-white font-medium">{emi.productName}</h3>
                                                 <p className="text-gray-400 text-sm">
-                                                    {emi.paidMonths}/{emi.duration} months
+                                                    Started: {formatDate(emi.startMonth)} |
+                                                    Ends: {formatDate(details.endMonth)}
                                                 </p>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center space-x-3">
-                                                    <div className="flex-1 bg-gray-600 rounded-full h-2">
-                                                        <div
-                                                            className="bg-[#F70000] h-2 rounded-full transition-all duration-300"
-                                                            style={{ width: `${details.progress}%` }}
-                                                        ></div>
-                                                    </div>
-                                                    <span className="text-gray-300 text-sm font-medium">
-                                                        {details.progress.toFixed(0)}%
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <p className="text-[#F70000] font-bold">${emi.monthlyInstallment.toFixed(0)}</p>
-                                                <p className="text-gray-400 text-sm">
-                                                    {details.remainingMonths} remaining
-                                                </p>
-                                            </td>
-                                            <td className="px-6 py-4 text-center text-gray-300">
-                                                {formatDate(details.endMonth)}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="flex items-center justify-center space-x-2">
-                                                    <button
-                                                        onClick={() => handleMarkAsPaid(emi)}
-                                                        className="p-2 text-green-400 hover:bg-green-500/20 rounded-lg transition-colors"
-                                                        title="Mark as paid"
-                                                    >
-                                                        <CheckCircleIcon className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => openEditModal(emi)}
-                                                        className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors"
-                                                        title="Edit"
-                                                    >
-                                                        <PencilIcon className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(emi.id)}
-                                                        className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-                                                        title="Delete"
-                                                    >
-                                                        <TrashIcon className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <button
+                                                onClick={() => handleMarkAsPaid(emi)}
+                                                className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors"
+                                                title="Mark as paid"
+                                            >
+                                                <CheckCircleIcon className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => openEditModal(emi)}
+                                                className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors"
+                                                title="Edit EMI"
+                                            >
+                                                <PencilIcon className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(emi.id)}
+                                                className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+                                                title="Delete EMI"
+                                            >
+                                                <TrashIcon className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                        <div>
+                                            <p className="text-gray-400 text-sm">Total Amount</p>
+                                            <p className="text-white font-medium">₹{emi.totalAmount.toLocaleString()}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-400 text-sm">Monthly EMI</p>
+                                            <p className="text-white font-medium">₹{emi.monthlyInstallment.toLocaleString()}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-400 text-sm">Paid Months</p>
+                                            <p className="text-white font-medium">{emi.paidMonths}/{emi.duration}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-400 text-sm">Remaining</p>
+                                            <p className="text-white font-medium">{details.remainingMonths} months</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Progress Bar */}
+                                    <div className="w-full bg-gray-600 rounded-full h-2">
+                                        <div
+                                            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                            style={{ width: `${details.progress}%` }}
+                                        />
+                                    </div>
+                                    <p className="text-gray-400 text-xs mt-2">
+                                        {details.progress.toFixed(1)}% completed
+                                    </p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
-            {/* Completed EMIs Section */}
+            {/* Completed EMIs */}
             {completedEMIs.length > 0 && (
-                <div className="bg-[#383838] rounded-2xl border border-gray-600 shadow-xl overflow-hidden">
+                <div className="bg-[#232326] rounded-xl border border-gray-600">
                     <div className="p-6 border-b border-gray-600">
-                        <h2 className="text-2xl font-bold text-white">Completed EMIs</h2>
+                        <h2 className="text-lg font-semibold text-white">Completed EMIs</h2>
                     </div>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-[#232326] border-b border-gray-600">
-                                <tr>
-                                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Product</th>
-                                    <th className="px-6 py-4 text-right text-sm font-medium text-gray-300">Total Amount</th>
-                                    <th className="px-6 py-4 text-center text-sm font-medium text-gray-300">Duration</th>
-                                    <th className="px-6 py-4 text-center text-sm font-medium text-gray-300">Monthly</th>
-                                    <th className="px-6 py-4 text-center text-sm font-medium text-gray-300">Completed</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-600">
-                                {completedEMIs.map((emi) => {
-                                    const details = calculateEMIDetails(emi);
-                                    return (
-                                        <tr key={emi.id} className="hover:bg-[#232326] transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div>
-                                                    <p className="text-white font-medium">{emi.productName}</p>
-                                                    <p className="text-gray-400 text-sm">
-                                                        {formatDate(emi.startMonth)} - {formatDate(details.endMonth)}
-                                                    </p>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <p className="text-white font-bold">${emi.totalAmount.toLocaleString()}</p>
-                                            </td>
-                                            <td className="px-6 py-4 text-center text-gray-300">
-                                                {emi.duration} months
-                                            </td>
-                                            <td className="px-6 py-4 text-center text-gray-300">
-                                                ${emi.monthlyInstallment.toFixed(0)}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="flex items-center justify-center space-x-2">
-                                                    <CheckCircleIcon className="w-5 h-5 text-green-400" />
-                                                    <span className="text-green-400 font-medium">Completed</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                    <div className="divide-y divide-gray-600">
+                        {completedEMIs.map((emi) => {
+                            const details = calculateEMIDetails(emi);
+                            return (
+                                <div key={emi.id} className="p-6">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-4">
+                                            <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                                                <CheckCircleIcon className="h-6 w-6 text-green-400" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-white font-medium">{emi.productName}</h3>
+                                                <p className="text-gray-400 text-sm">
+                                                    Completed: {formatDate(details.endMonth)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-white font-medium">₹{emi.totalAmount.toLocaleString()}</p>
+                                            <p className="text-gray-400 text-sm">Fully paid</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
 
-            {/* Add/Edit Modal */}
+            {/* Add/Edit EMI Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-                    <div className="bg-[#232326] rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-2xl font-bold text-white">
-                                {editingEMI ? 'Edit EMI' : 'Add New EMI'}
-                            </h3>
-                            <button
-                                onClick={closeModal}
-                                className="p-2 text-gray-400 hover:text-white hover:bg-[#383838] rounded-lg transition-colors"
-                            >
-                                <XMarkIcon className="w-5 h-5" />
-                            </button>
-                        </div>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-[#232326] rounded-xl p-6 w-full max-w-md mx-4 border border-gray-600">
+                        <h2 className="text-xl font-bold text-white mb-4">
+                            {editingEMI ? 'Edit EMI' : 'Add New EMI'}
+                        </h2>
 
-                        <form onSubmit={handleSave} className="space-y-6">
-                            {/* Product Name Field */}
+                        <form onSubmit={handleSave} className="space-y-4">
                             <div>
                                 <label className="block text-gray-300 text-sm font-medium mb-2">
-                                    Product Name *
+                                    Product Name
                                 </label>
                                 <input
                                     type="text"
                                     name="productName"
                                     value={formData.productName}
                                     onChange={handleInputChange}
-                                    placeholder="e.g., iPhone 15, Car Loan, Home Loan"
-                                    className="w-full px-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent placeholder-gray-500"
+                                    placeholder="e.g., iPhone 15, Car Loan"
+                                    className="w-full bg-[#1C1C1E] border border-gray-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F70000]"
                                     required
                                 />
                             </div>
 
-                            {/* Total Amount Field */}
                             <div>
                                 <label className="block text-gray-300 text-sm font-medium mb-2">
-                                    Total Amount *
+                                    Total Amount (₹)
                                 </label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</span>
-                                    <input
-                                        type="number"
-                                        name="totalAmount"
-                                        value={formData.totalAmount}
-                                        onChange={handleInputChange}
-                                        placeholder="0.00"
-                                        step="0.01"
-                                        min="0"
-                                        className="w-full pl-8 pr-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent placeholder-gray-500"
-                                        required
-                                    />
-                                </div>
+                                <input
+                                    type="number"
+                                    name="totalAmount"
+                                    value={formData.totalAmount}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter total amount"
+                                    className="w-full bg-[#1C1C1E] border border-gray-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F70000]"
+                                    min="0"
+                                    step="0.01"
+                                    required
+                                />
                             </div>
 
-                            {/* Duration Field */}
                             <div>
                                 <label className="block text-gray-300 text-sm font-medium mb-2">
-                                    Duration (months) *
+                                    Duration (months)
                                 </label>
                                 <input
                                     type="number"
                                     name="duration"
                                     value={formData.duration}
                                     onChange={handleInputChange}
-                                    placeholder="12"
+                                    placeholder="Enter duration in months"
+                                    className="w-full bg-[#1C1C1E] border border-gray-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F70000]"
                                     min="1"
-                                    className="w-full px-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent placeholder-gray-500"
                                     required
                                 />
                             </div>
 
-                            {/* Start Month Field */}
                             <div>
                                 <label className="block text-gray-300 text-sm font-medium mb-2">
-                                    Start Month *
+                                    Start Month
                                 </label>
                                 <input
                                     type="month"
                                     name="startMonth"
                                     value={formData.startMonth}
                                     onChange={handleInputChange}
-                                    className="w-full px-4 py-3 rounded-lg bg-[#383838] text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#F70000] focus:border-transparent"
+                                    className="w-full bg-[#1C1C1E] border border-gray-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F70000]"
                                     required
                                 />
                             </div>
 
-                            {/* Monthly Installment Preview */}
-                            {formData.totalAmount && formData.duration && (
-                                <div className="bg-[#383838] rounded-lg p-4 border border-gray-600">
-                                    <p className="text-gray-400 text-sm mb-1">Monthly Installment</p>
-                                    <p className="text-2xl font-bold text-[#F70000]">
-                                        ${(parseFloat(formData.totalAmount) / parseInt(formData.duration)).toFixed(0)}
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Action Buttons */}
-                            <div className="flex space-x-4 pt-4">
+                            <div className="flex space-x-3 pt-4">
                                 <button
                                     type="button"
                                     onClick={closeModal}
-                                    className="flex-1 px-4 py-3 text-gray-300 bg-[#383838] hover:bg-gray-600 rounded-lg transition-colors duration-200"
+                                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="flex-1 px-4 py-3 bg-[#F70000] hover:bg-red-700 text-white font-medium rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex-1 bg-[#F70000] hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 disabled:opacity-50"
                                 >
-                                    {loading ? 'Saving...' : (editingEMI ? 'Update' : 'Add EMI')}
+                                    {loading ? 'Saving...' : (editingEMI ? 'Update' : 'Add')}
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
+
+            {/* Toast Notifications */}
+            <div className="fixed bottom-4 right-4 space-y-2 z-50">
+                {toasts.map(toast => (
+                    <div
+                        key={toast.id}
+                        className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' :
+                                toast.type === 'error' ? 'bg-red-500 text-white' :
+                                    'bg-blue-500 text-white'
+                            }`}
+                    >
+                        {toast.message}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 } 

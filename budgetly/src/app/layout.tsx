@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "../context/AuthContext";
+import { DataProvider } from "../context/DataContext";
 
 export const metadata: Metadata = {
   title: "Budgetly - Personal Finance Tracker",
@@ -14,7 +16,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-['Lexend']">
-        {children}
+        <AuthProvider>
+          <DataProvider>
+            {children}
+          </DataProvider>
+        </AuthProvider>
       </body>
     </html>
   );
