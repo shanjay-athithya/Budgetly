@@ -377,13 +377,88 @@ export default function ReportsManager() {
     // Share functionality
     const shareReport = async () => {
         try {
-            if (navigator.share) {
+            // Generate PDF as a Blob
+            if (navigator.canShare && navigator.canShare({ files: [] })) {
+                setLoading(true);
+                if (!reportRef.current) {
+                    addToast('Report content not found', 'error');
+                    setLoading(false);
+                    return;
+                }
+                // Create a temporary container for PDF content
+                const tempContainer = document.createElement('div');
+                tempContainer.style.position = 'absolute';
+                tempContainer.style.left = '-9999px';
+                tempContainer.style.top = '0';
+                tempContainer.style.width = '800px';
+                tempContainer.style.backgroundColor = '#1C1C1E';
+                tempContainer.style.color = '#FFFFFF';
+                tempContainer.style.fontFamily = 'Lexend, sans-serif';
+                tempContainer.style.padding = '40px';
+                tempContainer.style.borderRadius = '12px';
+                document.body.appendChild(tempContainer);
+
+                // Generate PDF content
+                const pdfContent = generatePDFContent();
+                tempContainer.innerHTML = pdfContent;
+
+                // Wait for content to render
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Convert to canvas
+                const canvas = await html2canvas(tempContainer, {
+                    backgroundColor: '#1C1C1E',
+                    scale: 2,
+                    width: 800,
+                    height: tempContainer.scrollHeight,
+                    useCORS: true,
+                    allowTaint: true,
+                    logging: false
+                });
+
+                // Remove temporary container
+                document.body.removeChild(tempContainer);
+
+                // Create PDF
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                const imgWidth = pdfWidth - 20;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                let heightLeft = imgHeight;
+                let position = 10;
+
+                pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                heightLeft -= (pdfHeight - 20);
+
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight + 10;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                    heightLeft -= (pdfHeight - 20);
+                }
+
+                // Get PDF as Blob
+                const pdfBlob = pdf.output('blob');
+                const fileName = `financial-report-${selectedMonth}-${new Date().toISOString().slice(0, 10)}.pdf`;
+                const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+                await navigator.share({
+                    title: `Financial Report - ${formatDate(selectedMonth)}`,
+                    text: `Here is my financial report for ${formatDate(selectedMonth)}`,
+                    files: [pdfFile]
+                });
+                addToast('PDF report shared successfully!', 'success');
+                setLoading(false);
+            } else if (navigator.share) {
                 await navigator.share({
                     title: `Financial Report - ${formatDate(selectedMonth)}`,
                     text: `Check out my financial report for ${formatDate(selectedMonth)}`,
                     url: window.location.href
                 });
-                addToast('Report shared successfully!', 'success');
+                addToast('Report shared successfully (link only, file sharing not supported on this device/browser, Download and share instead).', 'success');
             } else {
                 // Fallback: copy to clipboard
                 await navigator.clipboard.writeText(
@@ -396,6 +471,7 @@ export default function ReportsManager() {
             }
         } catch (error: unknown) {
             addToast(error instanceof Error ? error.message : 'Failed to share report. Please try again.', 'error');
+            setLoading(false);
         }
     };
 
