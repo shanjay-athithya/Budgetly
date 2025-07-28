@@ -97,8 +97,8 @@ export default function Layout() {
                                 </svg>
                             </button>
                             <div>
-                                <h3 className="text-xl font-bold text-[#F70000]">Smarter spending. Stress free saving. Thats Budgetly.</h3>
-                                
+                                <h3 className="text-xl font-bold text-[#F70000] hidden lg:block">Smarter spending. Stress free saving. Thats Budgetly.</h3>
+
                             </div>
                         </div>
 
