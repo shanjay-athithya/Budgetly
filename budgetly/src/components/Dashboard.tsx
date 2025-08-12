@@ -109,25 +109,24 @@ export default function Dashboard() {
         return months.length > 0 ? months : [currentMonth];
     };
 
-    // Generate monthly data for charts
+    // Generate monthly data for charts (based on selected month)
     const generateMonthlyData = useCallback(() => {
-        if (!user || !user.months) return [];
+        if (!user || !user.months || !currentMonth) return [];
 
-        const months = Object.keys(user.months).sort();
-        return months.map(month => {
-            const monthData = user.months[month];
-            const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
-            const totalExpenses = monthData.expenses.reduce((sum, expense) => sum + expense.amount, 0);
-            const savings = totalIncome - totalExpenses;
+        const monthData = user.months[currentMonth];
+        if (!monthData) return [];
 
-            return {
-                month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-                income: totalIncome,
-                expenses: totalExpenses,
-                savings: savings
-            };
-        });
-    }, [user]);
+        const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
+        const totalExpenses = monthData.expenses.reduce((sum, expense) => sum + expense.amount, 0);
+        const savings = totalIncome - totalExpenses;
+
+        return [{
+            month: new Date(currentMonth + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+            income: totalIncome,
+            expenses: totalExpenses,
+            savings: savings
+        }];
+    }, [user, currentMonth]);
 
     // Generate category breakdown for pie chart
     const generateCategoryBreakdown = useCallback(() => {
@@ -392,7 +391,9 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Monthly Overview Chart */}
                 <div className="bg-[#232326] rounded-xl p-6 border border-gray-600">
-                    <h3 className="text-lg font-semibold text-white mb-4">Monthly Overview</h3>
+                    <h3 className="text-lg font-semibold text-white mb-4">
+                        {currentMonth ? `${new Date(currentMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Overview` : 'Monthly Overview'}
+                    </h3>
                     <div className="h-64">
                         <Bar
                             data={monthlyChartData}
@@ -421,7 +422,9 @@ export default function Dashboard() {
 
                 {/* Category Breakdown */}
                 <div className="bg-[#232326] rounded-xl p-6 border border-gray-600">
-                    <h3 className="text-lg font-semibold text-white mb-4">Expense Categories</h3>
+                    <h3 className="text-lg font-semibold text-white mb-4">
+                        {currentMonth ? `${new Date(currentMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Expense Categories` : 'Expense Categories'}
+                    </h3>
                     <div className="h-64">
                         <Doughnut
                             data={categoryChartData}
