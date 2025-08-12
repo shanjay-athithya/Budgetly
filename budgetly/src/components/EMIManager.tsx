@@ -56,7 +56,7 @@ export default function EMIManager() {
     useEffect(() => {
         if (user && user.months) {
             const allEMIs: EMIEntry[] = [];
-            const emiGroups: { [key: string]: any[] } = {};
+            const emiGroups: { [key: string]: (Expense & { month: string })[] } = {};
 
             // Group EMI installments by their base product name
             Object.entries(user.months).forEach(([month, monthData]) => {
@@ -296,7 +296,7 @@ export default function EMIManager() {
 
         try {
             // Find all installments for this EMI
-            const allInstallments: any[] = [];
+            const allInstallments: (Expense & { month: string })[] = [];
             Object.entries(user.months).forEach(([month, monthData]) => {
                 monthData.expenses.forEach((expense: Expense) => {
                     if (expense.type === 'emi' && expense.emiDetails) {

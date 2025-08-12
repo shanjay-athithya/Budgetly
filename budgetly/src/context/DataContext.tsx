@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, ReactNode } from 'react';
 import { userAPI, incomeAPI, expensesAPI, suggestionsAPI, utils, User, Expense, ProductSuggestion, IncomeEntry } from '../services/api';
 
 // State interface
@@ -158,7 +158,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(appReducer, initialState);
 
     // Helper function to safely filter expenses
-    const safeFilterExpenses = useCallback((expenses: any[], filterFn: (exp: Expense) => boolean) => {
+    const safeFilterExpenses = useCallback((expenses: unknown[], filterFn: (exp: Expense) => boolean) => {
         return Array.isArray(expenses) ? expenses.filter(filterFn) : [];
     }, []);
 
