@@ -104,7 +104,7 @@ function appReducer(state: AppState, action: Action): AppState {
         case 'DELETE_EXPENSE':
             return {
                 ...state,
-                expenses: state.expenses.filter(exp => exp._id !== action.payload)
+                expenses: Array.isArray(state.expenses) ? state.expenses.filter(exp => exp._id !== action.payload) : []
             };
 
         case 'ADD_SUGGESTION':
@@ -143,6 +143,8 @@ interface DataContextType {
     loadSuggestions: (uid: string, limit?: number) => Promise<void>;
     createSuggestion: (suggestionData: Omit<ProductSuggestion, '_id' | 'suggestedAt'>) => Promise<void>;
     deleteSuggestion: (uid: string, suggestionId: string) => Promise<void>;
+    // Data loading actions
+    loadDataForMonth: (uid: string, month: string) => Promise<void>;
     // Utility actions
     setCurrentMonth: (month: string) => void;
     clearError: () => void;
@@ -154,6 +156,11 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 // Provider component
 export function DataProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(appReducer, initialState);
+
+    // Helper function to safely filter expenses
+    const safeFilterExpenses = useCallback((expenses: any[], filterFn: (exp: Expense) => boolean) => {
+        return Array.isArray(expenses) ? expenses.filter(filterFn) : [];
+    }, []);
 
     const loadUser = useCallback(async (uid: string) => {
         console.log('🔍 loadUser called for UID:', uid);
@@ -175,9 +182,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
             console.log('💰 Income array length:', monthData.income?.length);
             console.log('💸 Expenses array length:', monthData.expenses?.length);
 
-            dispatch({ type: 'SET_INCOMES', payload: monthData.income || [] });
-            dispatch({ type: 'SET_EXPENSES', payload: monthData.expenses || [] });
-            dispatch({ type: 'SET_EMIS', payload: (monthData.expenses || []).filter((exp: Expense) => exp.type === 'emi') });
+            // Ensure arrays before dispatching
+            const incomeArray = Array.isArray(monthData.income) ? monthData.income : [];
+            const expensesArray = Array.isArray(monthData.expenses) ? monthData.expenses : [];
+            const emisArray = safeFilterExpenses(expensesArray, (exp: Expense) => exp.type === 'emi');
+
+            dispatch({ type: 'SET_INCOMES', payload: incomeArray });
+            dispatch({ type: 'SET_EXPENSES', payload: expensesArray });
+            dispatch({ type: 'SET_EMIS', payload: emisArray });
             console.log('✅ User data loaded successfully');
         } catch (error: unknown) {
             console.error('❌ Error loading user:', error);
@@ -314,13 +326,40 @@ export function DataProvider({ children }: { children: ReactNode }) {
         try {
             const monthKey = month || state.currentMonth;
             const expenses = await expensesAPI.getExpenses(uid, monthKey);
-            dispatch({ type: 'SET_EXPENSES', payload: expenses });
-            dispatch({ type: 'SET_EMIS', payload: expenses.filter((exp: Expense) => exp.type === 'emi') });
+
+            // Ensure expenses is an array before filtering
+            const expensesArray = Array.isArray(expenses) ? expenses : [];
+            const emisArray = safeFilterExpenses(expensesArray, (exp: Expense) => exp.type === 'emi');
+
+            dispatch({ type: 'SET_EXPENSES', payload: expensesArray });
+            dispatch({ type: 'SET_EMIS', payload: emisArray });
         } catch (error: unknown) {
             dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
         }
     }, [state.currentMonth]);
+
+    const loadDataForMonth = useCallback(async (uid: string, month: string) => {
+        try {
+            // Load both income and expenses for the specific month
+            const [incomeData, expenses] = await Promise.all([
+                incomeAPI.getIncome(uid, month),
+                expensesAPI.getExpenses(uid, month)
+            ]);
+
+            // Ensure expenses is an array before filtering
+            const expensesArray = Array.isArray(expenses) ? expenses : [];
+            const emisArray = safeFilterExpenses(expensesArray, (exp: Expense) => exp.type === 'emi');
+
+            dispatch({ type: 'SET_INCOMES', payload: incomeData.income || [] });
+            dispatch({ type: 'SET_EXPENSES', payload: expensesArray });
+            dispatch({ type: 'SET_EMIS', payload: emisArray });
+        } catch (error: unknown) {
+            console.error('Error loading data for month:', error);
+            dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Unknown error' });
+            throw error;
+        }
+    }, []);
 
     const addExpense = useCallback(async (uid: string, month: string, expense: Omit<Expense, '_id'>) => {
         dispatch({ type: 'SET_LOADING', payload: true });
@@ -459,6 +498,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         addExpense,
         updateExpense,
         deleteExpense,
+        loadDataForMonth,
         loadSuggestions,
         createSuggestion,
         deleteSuggestion,

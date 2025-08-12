@@ -87,11 +87,11 @@ export default function SuggestionsManager() {
             ? monthData.expenses.reduce((sum, expense) => sum + expense.amount, 0)
             : 0;
 
-        // Calculate existing EMIs
+        // Calculate existing EMIs (monthly installments for this month)
         const existingEMIs = monthData.expenses && Array.isArray(monthData.expenses)
             ? monthData.expenses
-                .filter(expense => expense.type === 'emi' && expense.emiDetails)
-                .reduce((sum, expense) => sum + (expense.emiDetails?.monthlyAmount || 0), 0)
+                .filter(expense => expense.type === 'emi')
+                .reduce((sum, expense) => sum + expense.amount, 0)
             : 0;
 
         // Calculate savings

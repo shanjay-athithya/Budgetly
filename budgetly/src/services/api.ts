@@ -314,21 +314,19 @@ export const utils = {
         return expenses.reduce((sum, expense) => sum + expense.amount, 0);
     },
 
-    // Get active EMIs
+    // Get active EMIs (installments that haven't been paid yet)
     getActiveEMIs(expenses: Expense[]): Expense[] {
         return expenses.filter(expense =>
             expense.type === 'emi' &&
-            expense.emiDetails &&
-            expense.emiDetails.remainingMonths > 0
+            new Date(expense.date) > new Date()
         );
     },
 
-    // Calculate total EMI burden
+    // Calculate total EMI burden (monthly installments for current month)
     calculateTotalEMIBurden(expenses: Expense[]): number {
-        const activeEMIs = this.getActiveEMIs(expenses);
-        return activeEMIs.reduce((sum, emi) => {
-            return sum + (emi.emiDetails?.monthlyAmount || 0);
-        }, 0);
+        return expenses
+            .filter(expense => expense.type === 'emi')
+            .reduce((sum, expense) => sum + expense.amount, 0);
     },
 
     // Calculate financial health score (0-100)
@@ -384,10 +382,10 @@ export const utils = {
         }
 
         // EMI analysis
-        const activeEMIs = this.getActiveEMIs(expenses);
-        if (activeEMIs.length > 0) {
+        const emiExpenses = expenses.filter(expense => expense.type === 'emi');
+        if (emiExpenses.length > 0) {
             const totalEMI = this.calculateTotalEMIBurden(expenses);
-            insights.push(`You have ${activeEMIs.length} active EMI(s) totaling ₹${totalEMI.toLocaleString()}/month`);
+            insights.push(`You have ${emiExpenses.length} EMI installment(s) totaling ₹${totalEMI.toLocaleString()} this month`);
         }
 
         // Large expense analysis

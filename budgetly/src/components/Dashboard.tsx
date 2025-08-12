@@ -66,19 +66,34 @@ export default function Dashboard() {
         if (!monthData) return {
             totalIncome: 0, totalExpenses: 0, currentSavings: 0, totalEMIs: 0, expenseRatio: 0, emiRatio: 0
         };
-        const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
-        const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
-        const totalEMIs = utils.calculateTotalEMIBurden(monthData.expenses);
+
+        // Ensure income and expenses are arrays
+        const monthIncome = Array.isArray(monthData.income) ? monthData.income : [];
+        const monthExpenses = Array.isArray(monthData.expenses) ? monthData.expenses : [];
+
+        const totalIncome = monthIncome.reduce((sum, item) => sum + item.amount, 0);
+
+        // Calculate total expenses (including EMI installments for this month only)
+        const totalExpenses = monthExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+        // Calculate EMI burden for this month only (monthly installments)
+        const totalEMIs = monthExpenses
+            .filter(expense => expense.type === 'emi')
+            .reduce((sum, expense) => sum + expense.amount, 0);
+
         // Calculate current month savings
         const currentMonthSavings = totalIncome - totalExpenses;
+
         // Calculate total accumulated savings including initial savings
         const initialSavings = user.savings || 0;
         const allMonths = Object.keys(user.months || {}).sort();
         const accumulatedSavings = allMonths.reduce((total, month) => {
             const monthData = user.months[month];
-            const monthIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
-            const monthExpenses = utils.calculateTotalExpenses(monthData.expenses);
-            return total + (monthIncome - monthExpenses);
+            const monthIncome = Array.isArray(monthData.income) ? monthData.income : [];
+            const monthExpenses = Array.isArray(monthData.expenses) ? monthData.expenses : [];
+            const monthIncomeTotal = monthIncome.reduce((sum, item) => sum + item.amount, 0);
+            const monthExpensesTotal = monthExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+            return total + (monthIncomeTotal - monthExpensesTotal);
         }, 0);
         const currentSavings = accumulatedSavings + initialSavings;
         const expenseRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
@@ -102,7 +117,7 @@ export default function Dashboard() {
         return months.map(month => {
             const monthData = user.months[month];
             const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
-            const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
+            const totalExpenses = monthData.expenses.reduce((sum, expense) => sum + expense.amount, 0);
             const savings = totalIncome - totalExpenses;
 
             return {
@@ -141,7 +156,7 @@ export default function Dashboard() {
         return months.map(month => {
             const monthData = user.months[month];
             const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
-            const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
+            const totalExpenses = monthData.expenses.reduce((sum, expense) => sum + expense.amount, 0);
             const savings = totalIncome - totalExpenses;
             return {
                 month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),

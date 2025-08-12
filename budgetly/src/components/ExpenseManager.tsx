@@ -37,7 +37,7 @@ const expenseCategories = [
 ];
 
 export default function ExpenseManager() {
-    const { state, addExpense, updateExpense, deleteExpense } = useData();
+    const { state, addExpense, updateExpense, deleteExpense, loadDataForMonth } = useData();
     const { user, currentMonth, expenses, emis, loading, error } = state;
 
     const [showModal, setShowModal] = useState(false);
@@ -85,19 +85,31 @@ export default function ExpenseManager() {
         setFilters(prev => ({ ...prev, month: currentMonth }));
     }, [currentMonth]);
 
-    // Calculate totals using global expenses state
-    const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-    const currentMonthExpenses = expenses.filter(expense => {
-        const expenseDate = getDateString(expense.date);
-        return expenseDate === currentMonth;
-    }).reduce((sum, expense) => sum + expense.amount, 0);
+    // Load data for selected month when filter changes
+    useEffect(() => {
+        if (user && filters.month && filters.month !== currentMonth) {
+            console.log('📅 Loading expense data for month:', filters.month);
+            loadDataForMonth(user.uid, filters.month);
+        }
+    }, [filters.month, user, currentMonth, loadDataForMonth]);
 
-    // Filter expenses using global expenses state
-    const filteredExpenses = expenses.filter(expense => {
-        const expenseDate = getDateString(expense.date);
-        const matchesMonth = expenseDate === filters.month;
+    // Get expense data for the selected month from user data
+    const getExpensesForSelectedMonth = () => {
+        if (!user || !user.months || !filters.month) return [];
+        const monthData = user.months[filters.month];
+        return monthData && monthData.expenses ? monthData.expenses : [];
+    };
+
+    const monthExpenses = getExpensesForSelectedMonth();
+
+    // Calculate totals using filtered expenses for selected month
+    const totalExpenses = monthExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const currentMonthExpenses = totalExpenses; // For the selected month
+
+    // Filter expenses by category
+    const filteredExpenses = monthExpenses.filter(expense => {
         const matchesCategory = filters.category === 'all' || expense.category === filters.category;
-        return matchesMonth && matchesCategory;
+        return matchesCategory;
     });
 
     // Toast management
@@ -193,8 +205,41 @@ export default function ExpenseManager() {
                 await updateExpense(user.uid, currentMonth, editingExpense._id!, expenseData);
                 addToast('Expense updated successfully!', 'success');
             } else {
-                await addExpense(user.uid, currentMonth, expenseData);
-                addToast('Expense added successfully!', 'success');
+                if (formData.type === 'emi') {
+                    // Handle EMI creation - distribute across months
+                    const startDate = new Date(formData.emiStartMonth || formData.date);
+                    const duration = parseInt(formData.emiDuration);
+                    const monthlyInstallment = amount / duration;
+                    
+                    // Create EMI installments for each month
+                    for (let i = 0; i < duration; i++) {
+                        const emiMonth = new Date(startDate);
+                        emiMonth.setMonth(emiMonth.getMonth() + i);
+                        const monthKey = emiMonth.toISOString().slice(0, 7);
+                        
+                        const emiExpenseData = {
+                            label: `${formData.label} - EMI ${i + 1}/${duration}`,
+                            amount: monthlyInstallment,
+                            category: formData.category,
+                            date: emiMonth,
+                            type: 'emi' as const,
+                            emiDetails: {
+                                duration: duration,
+                                remainingMonths: duration - i - 1,
+                                monthlyAmount: monthlyInstallment,
+                                startedOn: startDate,
+                                installmentNumber: i + 1,
+                                totalInstallments: duration
+                            }
+                        };
+                        
+                        await addExpense(user.uid, monthKey, emiExpenseData);
+                    }
+                    addToast(`EMI added successfully! ${duration} installments created.`, 'success');
+                } else {
+                    await addExpense(user.uid, currentMonth, expenseData);
+                    addToast('Expense added successfully!', 'success');
+                }
             }
 
             closeModal();

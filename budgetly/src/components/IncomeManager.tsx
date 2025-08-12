@@ -29,7 +29,7 @@ const incomeSources = [
 ];
 
 export default function IncomeManager() {
-    const { state, addIncome, updateIncome, deleteIncome } = useData();
+    const { state, addIncome, updateIncome, deleteIncome, loadDataForMonth } = useData();
     const { user, currentMonth, incomes, loading, error } = state;
 
     console.log('🎯 IncomeManager render - incomes:', JSON.stringify(incomes, null, 2));
@@ -83,22 +83,31 @@ export default function IncomeManager() {
     console.log('All income months:', incomes.map(i => getMonthString(i.date)));
     console.log('Current filter month:', filters.month);
 
-    // Filter incomes using bulletproof month filter
-    const filteredIncomes = incomes.filter(income => {
-        return getMonthString(income.date) === filters.month;
-    });
+    // Get income data for the selected month from user data
+    const getIncomeForSelectedMonth = () => {
+        if (!user || !user.months || !filters.month) return [];
+        const monthData = user.months[filters.month];
+        return monthData && monthData.income ? monthData.income : [];
+    };
+
+    const filteredIncomes = getIncomeForSelectedMonth();
 
     // Update filters when currentMonth changes
     useEffect(() => {
         setFilters(prev => ({ ...prev, month: currentMonth }));
     }, [currentMonth]);
 
-    // Calculate totals using global incomes state
-    const totalIncome = incomes.reduce((sum, income) => sum + income.amount, 0);
-    const currentMonthIncome = incomes.filter(income => {
-        const incomeDate = getDateString(income.date);
-        return incomeDate === currentMonth;
-    }).reduce((sum, income) => sum + income.amount, 0);
+    // Load data for selected month when filter changes
+    useEffect(() => {
+        if (user && filters.month && filters.month !== currentMonth) {
+            console.log('📅 Loading income data for month:', filters.month);
+            loadDataForMonth(user.uid, filters.month);
+        }
+    }, [filters.month, user, currentMonth, loadDataForMonth]);
+
+    // Calculate totals using filtered incomes for selected month
+    const totalIncome = filteredIncomes.reduce((sum, income) => sum + income.amount, 0);
+    const currentMonthIncome = totalIncome; // For the selected month
 
     // Toast management
     const addToast = useCallback((message: string, type: Toast['type']) => {

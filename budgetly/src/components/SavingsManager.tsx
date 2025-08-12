@@ -67,7 +67,7 @@ export default function SavingsManager() {
         return months.map(month => {
             const monthData = user.months[month];
             const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
-            const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
+            const totalExpenses = monthData.expenses.reduce((sum, expense) => sum + expense.amount, 0);
             const savings = totalIncome - totalExpenses;
 
             return {
@@ -172,7 +172,7 @@ export default function SavingsManager() {
         if (!monthData) return 0;
 
         const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
-        const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
+        const totalExpenses = monthData.expenses.reduce((sum, expense) => sum + expense.amount, 0);
         return totalIncome - totalExpenses;
     }, [user, currentMonth]);
 
@@ -186,7 +186,7 @@ export default function SavingsManager() {
         const totalIncome = monthData.income.reduce((sum, item) => sum + item.amount, 0);
         if (totalIncome === 0) return 0;
 
-        const totalExpenses = utils.calculateTotalExpenses(monthData.expenses);
+        const totalExpenses = monthData.expenses.reduce((sum, expense) => sum + expense.amount, 0);
         const savings = totalIncome - totalExpenses;
         return (savings / totalIncome) * 100;
     }, [user, currentMonth]);

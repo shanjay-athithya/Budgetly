@@ -25,7 +25,7 @@ export default function Login() {
             <div
                 className="absolute inset-0 z-0 bg-cover bg-center"
                 style={{
-                    backgroundImage: `url('https://ik.imagekit.io/hmx3cjrmq/image.png?updatedAt=1753637531406')`, // ✅ Add a background image in your public/images/
+                    backgroundImage: `url('/login.png')`,
                 }}
             />
             {/* Blur Overlay */}

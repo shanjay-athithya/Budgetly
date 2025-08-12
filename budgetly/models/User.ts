@@ -13,7 +13,9 @@ const EMIDetailsSchema = new Schema({
     duration: { type: Number, required: true }, // in months
     remainingMonths: { type: Number, required: true },
     monthlyAmount: { type: Number, required: true },
-    startedOn: { type: Date, required: true }
+    startedOn: { type: Date, required: true },
+    installmentNumber: { type: Number, required: false }, // which installment this is
+    totalInstallments: { type: Number, required: false } // total number of installments
 }, { _id: false });
 
 // Expense Schema
@@ -56,6 +58,8 @@ export interface IUser extends Document {
                     remainingMonths: number;
                     monthlyAmount: number;
                     startedOn: Date;
+                    installmentNumber?: number;
+                    totalInstallments?: number;
                 };
             }>;
         };

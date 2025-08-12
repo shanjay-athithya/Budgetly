@@ -56,24 +56,49 @@ export default function EMIManager() {
     useEffect(() => {
         if (user && user.months) {
             const allEMIs: EMIEntry[] = [];
+            const emiGroups: { [key: string]: any[] } = {};
 
+            // Group EMI installments by their base product name
             Object.entries(user.months).forEach(([month, monthData]) => {
                 monthData.expenses.forEach((expense: Expense) => {
                     if (expense.type === 'emi' && expense.emiDetails) {
-                        allEMIs.push({
-                            id: expense._id || Math.random().toString(),
-                            expenseId: expense._id,
-                            productName: expense.label,
-                            totalAmount: expense.amount,
-                            duration: expense.emiDetails.duration,
-                            startMonth: expense.emiDetails.startedOn.toString().slice(0, 7),
-                            monthlyInstallment: expense.emiDetails.monthlyAmount,
-                            paidMonths: expense.emiDetails.duration - expense.emiDetails.remainingMonths,
-                            isActive: expense.emiDetails.remainingMonths > 0,
-                            month: month
+                        // Extract base product name (remove EMI X/Y part)
+                        const baseProductName = expense.label.replace(/\s*-\s*EMI\s*\d+\/\d+/, '');
+
+                        if (!emiGroups[baseProductName]) {
+                            emiGroups[baseProductName] = [];
+                        }
+                        emiGroups[baseProductName].push({
+                            ...expense,
+                            month
                         });
                     }
                 });
+            });
+
+            // Convert grouped EMIs to EMIEntry format
+            Object.entries(emiGroups).forEach(([productName, installments]) => {
+                if (installments.length > 0) {
+                    const firstInstallment = installments[0];
+                    const totalAmount = installments.reduce((sum, inst) => sum + inst.amount, 0);
+                    const totalInstallments = installments.length;
+                    const paidInstallments = installments.filter(inst =>
+                        new Date(inst.date) <= new Date()
+                    ).length;
+
+                    allEMIs.push({
+                        id: firstInstallment._id || Math.random().toString(),
+                        expenseId: firstInstallment._id,
+                        productName: productName,
+                        totalAmount: totalAmount,
+                        duration: totalInstallments,
+                        startMonth: firstInstallment.emiDetails.startedOn.toString().slice(0, 7),
+                        monthlyInstallment: firstInstallment.emiDetails.monthlyAmount,
+                        paidMonths: paidInstallments,
+                        isActive: paidInstallments < totalInstallments,
+                        month: firstInstallment.month
+                    });
+                }
             });
 
             setLocalEMIs(allEMIs);
@@ -197,9 +222,35 @@ export default function EMIManager() {
                 await updateExpense(user.uid, editingEMI.month || currentMonth, editingEMI.expenseId, expenseData);
                 addToast('EMI updated successfully!', 'success');
             } else {
-                // Add new EMI
-                await addExpense(user.uid, currentMonth, expenseData);
-                addToast('EMI added successfully!', 'success');
+                // Add new EMI - distribute across all EMI months
+                const startDate = new Date(formData.startMonth + '-01');
+                const monthlyInstallment = totalAmount / duration;
+
+                // Create EMI installments for each month
+                for (let i = 0; i < duration; i++) {
+                    const emiMonth = new Date(startDate);
+                    emiMonth.setMonth(emiMonth.getMonth() + i);
+                    const monthKey = emiMonth.toISOString().slice(0, 7);
+
+                    const emiExpenseData = {
+                        label: `${formData.productName} - EMI ${i + 1}/${duration}`,
+                        amount: monthlyInstallment,
+                        category: 'EMI',
+                        date: emiMonth,
+                        type: 'emi' as const,
+                        emiDetails: {
+                            duration: duration,
+                            remainingMonths: duration - i - 1,
+                            monthlyAmount: monthlyInstallment,
+                            startedOn: startDate,
+                            installmentNumber: i + 1,
+                            totalInstallments: duration
+                        }
+                    };
+
+                    await addExpense(user.uid, monthKey, emiExpenseData);
+                }
+                addToast(`EMI added successfully! ${duration} installments created.`, 'success');
             }
 
             closeModal();
@@ -243,30 +294,50 @@ export default function EMIManager() {
             return;
         }
 
-        const newPaidMonths = Math.min(emi.paidMonths + 1, emi.duration);
-        const newRemainingMonths = Math.max(0, emi.duration - newPaidMonths);
-
         try {
-            const expenseData = {
-                label: emi.productName,
-                amount: emi.totalAmount,
-                category: 'EMI',
-                date: new Date(emi.startMonth + '-01'),
-                type: 'emi' as const,
-                emiDetails: {
-                    duration: emi.duration,
-                    remainingMonths: newRemainingMonths,
-                    monthlyAmount: emi.monthlyInstallment,
-                    startedOn: new Date(emi.startMonth + '-01')
-                }
-            };
+            // Find all installments for this EMI
+            const allInstallments: any[] = [];
+            Object.entries(user.months).forEach(([month, monthData]) => {
+                monthData.expenses.forEach((expense: Expense) => {
+                    if (expense.type === 'emi' && expense.emiDetails) {
+                        const baseProductName = expense.label.replace(/\s*-\s*EMI\s*\d+\/\d+/, '');
+                        if (baseProductName === emi.productName) {
+                            allInstallments.push({ ...expense, month });
+                        }
+                    }
+                });
+            });
 
-            await updateExpense(user.uid, emi.month || currentMonth, emi.expenseId, expenseData);
-            addToast('Payment recorded successfully!', 'success');
+            // Sort installments by date
+            allInstallments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+            // Mark the next unpaid installment as paid
+            const nextUnpaidInstallment = allInstallments.find(inst =>
+                new Date(inst.date) > new Date()
+            );
+
+            if (nextUnpaidInstallment) {
+                const expenseData = {
+                    label: nextUnpaidInstallment.label,
+                    amount: nextUnpaidInstallment.amount,
+                    category: 'EMI',
+                    date: new Date(), // Mark as paid today
+                    type: 'emi' as const,
+                    emiDetails: {
+                        ...nextUnpaidInstallment.emiDetails,
+                        remainingMonths: Math.max(0, nextUnpaidInstallment.emiDetails.remainingMonths - 1)
+                    }
+                };
+
+                await updateExpense(user.uid, nextUnpaidInstallment.month, nextUnpaidInstallment._id!, expenseData);
+                addToast('Payment recorded successfully!', 'success');
+            } else {
+                addToast('All installments are already paid!', 'info');
+            }
         } catch (error: unknown) {
             addToast(error instanceof Error ? error.message : 'Failed to record payment. Please try again.', 'error');
         }
-    }, [user, currentMonth, updateExpense, addToast]);
+    }, [user, updateExpense, addToast]);
 
     const formatDate = useCallback((dateString: string) => {
         return new Date(dateString + '-01').toLocaleDateString('en-US', {
