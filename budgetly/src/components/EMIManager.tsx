@@ -80,6 +80,12 @@ export default function EMIManager() {
             Object.entries(emiGroups).forEach(([productName, installments]) => {
                 if (installments.length > 0) {
                     const firstInstallment = installments[0];
+
+                    // Skip if emiDetails is missing
+                    if (!firstInstallment.emiDetails) {
+                        return;
+                    }
+
                     const totalAmount = installments.reduce((sum, inst) => sum + inst.amount, 0);
                     const totalInstallments = installments.length;
                     const paidInstallments = installments.filter(inst =>
@@ -316,7 +322,7 @@ export default function EMIManager() {
                 new Date(inst.date) > new Date()
             );
 
-            if (nextUnpaidInstallment) {
+            if (nextUnpaidInstallment && nextUnpaidInstallment.emiDetails) {
                 const expenseData = {
                     label: nextUnpaidInstallment.label,
                     amount: nextUnpaidInstallment.amount,

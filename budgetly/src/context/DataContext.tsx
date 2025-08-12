@@ -159,7 +159,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     // Helper function to safely filter expenses
     const safeFilterExpenses = useCallback((expenses: unknown[], filterFn: (exp: Expense) => boolean) => {
-        return Array.isArray(expenses) ? expenses.filter(filterFn) : [];
+        return Array.isArray(expenses) ? (expenses as Expense[]).filter(filterFn) : [];
     }, []);
 
     const loadUser = useCallback(async (uid: string) => {
