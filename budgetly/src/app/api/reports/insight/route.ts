@@ -52,11 +52,20 @@ export async function POST(request: NextRequest) {
         const resp = await genAI.models.generateContent({
             model,
             contents: [{ role: 'user', parts: [{ text: system }, { text: JSON.stringify(prompt) }] }],
-            // @ts-ignore
+            // @ts-expect-error Gemini thinking config only for 2.5 models
             config: { thinkingConfig: { thinkingBudget: 0 } }
         } as any);
 
-        const text = (resp as any)?.response?.text || (resp as any)?.text || (resp as any)?.response?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text).filter(Boolean).join('\n');
+        const r = resp as unknown as {
+            response?: {
+                text?: string;
+                candidates?: { content?: { parts?: { text?: string }[] } }[]
+            };
+            text?: string;
+        };
+        const parts = r?.response?.candidates?.[0]?.content?.parts || [];
+        const joined = Array.isArray(parts) ? parts.map(p => p?.text).filter(Boolean).join('\n') : undefined;
+        const text = r?.response?.text || r?.text || joined;
         if (!text) return NextResponse.json({ error: 'Failed to generate report insight' }, { status: 502 });
 
         return NextResponse.json({ insight: String(text) });

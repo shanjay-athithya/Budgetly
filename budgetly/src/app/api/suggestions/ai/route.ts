@@ -131,22 +131,20 @@ Obey paymentType strictly:
                 contents: [
                     { role: 'user', parts: [{ text: system }, { text: JSON.stringify(payload) }] }
                 ],
-                // Optional on 2.5 models
-                // @ts-ignore
-                config: { thinkingConfig: { thinkingBudget: 0 } }
+                // Optional on 2.5 models; safe to omit if unsupported
+                config: {}
             } as any);
-            // Prefer convenience text field when available
-            const respText = (resp as any)?.response?.text || (resp as any)?.text;
-            if (respText && typeof respText === 'string') {
-                content = respText;
-            } else {
-                // Fallback: join all parts' text
-                const parts = (resp as any)?.response?.candidates?.[0]?.content?.parts;
-                if (Array.isArray(parts)) {
-                    const joined = parts.map((p: any) => p?.text).filter(Boolean).join('');
-                    content = joined || undefined;
-                }
-            }
+            const r = resp as unknown as {
+                response?: {
+                    text?: string;
+                    candidates?: { content?: { parts?: { text?: string }[] } }[]
+                };
+                text?: string;
+            };
+            const parts = r?.response?.candidates?.[0]?.content?.parts || [];
+            const joined = Array.isArray(parts) ? parts.map(p => p?.text).filter(Boolean).join('') : undefined;
+            const respText = r?.response?.text || r?.text || joined;
+            if (respText && typeof respText === 'string') content = respText;
         } catch (e: any) {
             const msg = e?.message || 'Gemini request failed';
             const lower = String(msg).toLowerCase();
