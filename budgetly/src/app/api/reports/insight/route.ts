@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
             model,
             contents: [{ role: 'user', parts: [{ text: system }, { text: JSON.stringify(prompt) }] }],
             config: {}
-        } as any);
+        });
 
         const r = resp as unknown as {
             response?: {

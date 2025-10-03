@@ -133,20 +133,21 @@ Obey paymentType strictly:
                 ],
                 // Optional on 2.5 models; safe to omit if unsupported
                 config: {}
-            } as any);
-            const r = resp as unknown as {
+            });
+            const r = resp as {
                 response?: {
                     text?: string;
                     candidates?: { content?: { parts?: { text?: string }[] } }[]
                 };
                 text?: string;
             };
-            const parts = r?.response?.candidates?.[0]?.content?.parts || [];
+            const parts = r.response?.candidates?.[0]?.content?.parts || [];
             const joined = Array.isArray(parts) ? parts.map(p => p?.text).filter(Boolean).join('') : undefined;
-            const respText = r?.response?.text || r?.text || joined;
+            const respText = r.response?.text || r.text || joined;
             if (respText && typeof respText === 'string') content = respText;
-        } catch (e: any) {
-            const msg = e?.message || 'Gemini request failed';
+        } catch (e) {
+            const err = e as { message?: string };
+            const msg = err?.message || 'Gemini request failed';
             const lower = String(msg).toLowerCase();
             if (lower.includes('quota')) {
                 return NextResponse.json({ error: 'LLM quota exceeded' }, { status: 402 });
