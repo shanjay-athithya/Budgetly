@@ -306,7 +306,8 @@ export default function SuggestionsManager() {
                 })
             });
             if (!res.ok) {
-                const err = await res.json().catch(() => ({} as any));
+                type ErrorBody = { error?: string; raw?: unknown };
+                const err: ErrorBody = await res.json().catch(() => ({} as ErrorBody));
                 // If backend returned raw model text, surface it in the UI so user sees details
                 if (err && err.raw) {
                     const fallbackSuggestion: SuggestionEntry = {
@@ -318,7 +319,7 @@ export default function SuggestionsManager() {
                         category: formData.category || 'Other',
                         suggestion: 'moderate',
                         reason: err.error || 'Model returned an unexpected format',
-                        explanation: typeof err.raw === 'string' ? err.raw : JSON.stringify(err.raw),
+                        explanation: typeof err.raw === 'string' ? err.raw : JSON.stringify(err.raw as object),
                         timestamp: new Date()
                     };
                     setCurrentSuggestion(fallbackSuggestion);
