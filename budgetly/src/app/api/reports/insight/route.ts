@@ -52,8 +52,7 @@ export async function POST(request: NextRequest) {
         const resp = await genAI.models.generateContent({
             model,
             contents: [{ role: 'user', parts: [{ text: system }, { text: JSON.stringify(prompt) }] }],
-            // @ts-expect-error Gemini thinking config only for 2.5 models
-            config: { thinkingConfig: { thinkingBudget: 0 } }
+            config: {}
         } as any);
 
         const r = resp as unknown as {
@@ -69,8 +68,9 @@ export async function POST(request: NextRequest) {
         if (!text) return NextResponse.json({ error: 'Failed to generate report insight' }, { status: 502 });
 
         return NextResponse.json({ insight: String(text) });
-    } catch (error: any) {
-        const msg = error?.message || 'Internal server error';
+    } catch (error) {
+        const err = error as { message?: string };
+        const msg = err?.message || 'Internal server error';
         return NextResponse.json({ error: msg }, { status: 500 });
     }
 }
