@@ -22,6 +22,7 @@ interface SuggestionEntry {
     category: string;
     suggestion: 'good' | 'moderate' | 'risky';
     reason: string;
+    explanation?: string;
     timestamp: Date;
 }
 
@@ -52,6 +53,7 @@ export default function SuggestionsManager() {
     const [showForm, setShowForm] = useState(false);
     const [currentSuggestion, setCurrentSuggestion] = useState<SuggestionEntry | null>(null);
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const [loadingAI, setLoadingAI] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -284,26 +286,84 @@ export default function SuggestionsManager() {
             return;
         }
 
-        const { suggestion, reason } = generateSuggestion(monthlyEMI, fullPrice);
+        if (!user) {
+            addToast('User not found', 'error');
+            return;
+        }
 
-        const newSuggestion: SuggestionEntry = {
-            id: Date.now().toString(),
-            productName: formData.productName.trim(),
-            fullPrice,
-            monthlyEMI,
-            duration,
-            category: formData.category || 'Other',
-            suggestion,
-            reason,
-            timestamp: new Date()
-        };
+        try {
+            setLoadingAI(true);
+            const res = await fetch('/api/suggestions/ai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    uid: user.uid,
+                    productName: formData.productName.trim(),
+                    price: formData.inputType === 'fullPrice' ? fullPrice : undefined,
+                    monthlyEMI: formData.inputType === 'emi' ? monthlyEMI : undefined,
+                    duration: formData.inputType === 'emi' ? duration : undefined,
+                    category: formData.category || 'Other'
+                })
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({} as any));
+                // If backend returned raw model text, surface it in the UI so user sees details
+                if (err && err.raw) {
+                    const fallbackSuggestion: SuggestionEntry = {
+                        id: Date.now().toString(),
+                        productName: formData.productName.trim(),
+                        fullPrice: formData.inputType === 'fullPrice' ? fullPrice : (monthlyEMI * duration),
+                        monthlyEMI: formData.inputType === 'emi' ? monthlyEMI : 0,
+                        duration: formData.inputType === 'emi' ? duration : 0,
+                        category: formData.category || 'Other',
+                        suggestion: 'moderate',
+                        reason: err.error || 'Model returned an unexpected format',
+                        explanation: typeof err.raw === 'string' ? err.raw : JSON.stringify(err.raw),
+                        timestamp: new Date()
+                    };
+                    setCurrentSuggestion(fallbackSuggestion);
+                    setSuggestions(prev => [fallbackSuggestion, ...prev]);
+                    addToast('Showing model response details', 'info');
+                    closeForm();
+                    return;
+                }
+                throw new Error(err.error || 'AI suggestion failed');
+            }
+            const data = await res.json();
+            const s = data.suggestion as {
+                _id: string;
+                productName: string;
+                price: number;
+                emiAmount?: number;
+                duration?: number;
+                suggestionScore: 'Good' | 'Moderate' | 'Risky';
+                reason: string;
+                suggestedAt: string;
+            };
+            const detailedExplanation: string | undefined = data.explanation;
 
-        setCurrentSuggestion(newSuggestion);
-        setSuggestions(prev => [newSuggestion, ...prev]);
-        addToast('Suggestion generated successfully!', 'success');
+            const newSuggestion: SuggestionEntry = {
+                id: s._id,
+                productName: s.productName,
+                fullPrice: s.price,
+                monthlyEMI: s.emiAmount ?? 0,
+                duration: s.duration ?? 0,
+                category: formData.category || 'Other',
+                suggestion: (s.suggestionScore.toLowerCase() as 'good' | 'moderate' | 'risky'),
+                reason: s.reason,
+                explanation: detailedExplanation || s.reason,
+                timestamp: new Date(s.suggestedAt)
+            };
 
-        // Close form after successful submission
-        closeForm();
+            setCurrentSuggestion(newSuggestion);
+            setSuggestions(prev => [newSuggestion, ...prev]);
+            addToast('AI suggestion generated!', 'success');
+            closeForm();
+        } catch (error: unknown) {
+            addToast(error instanceof Error ? error.message : 'Failed to generate AI suggestion', 'error');
+        } finally {
+            setLoadingAI(false);
+        }
     };
 
     // Save as planned EMI
@@ -489,14 +549,23 @@ export default function SuggestionsManager() {
                                 <p className="text-gray-400 text-sm">Total Price</p>
                                 <p className="text-xl font-bold text-white">₹{currentSuggestion.fullPrice.toLocaleString()}</p>
                             </div>
-                            <div>
-                                <p className="text-gray-400 text-sm">Monthly EMI</p>
-                                <p className="text-xl font-bold text-[#F70000]">₹{currentSuggestion.monthlyEMI.toFixed(0)}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-400 text-sm">Duration</p>
-                                <p className="text-xl font-bold text-white">{currentSuggestion.duration} months</p>
-                            </div>
+                            {currentSuggestion.monthlyEMI > 0 && currentSuggestion.duration > 0 ? (
+                                <>
+                                    <div>
+                                        <p className="text-gray-400 text-sm">Monthly EMI</p>
+                                        <p className="text-xl font-bold text-[#F70000]">₹{currentSuggestion.monthlyEMI.toFixed(0)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-400 text-sm">Duration</p>
+                                        <p className="text-xl font-bold text-white">{currentSuggestion.duration} months</p>
+                                    </div>
+                                </>
+                            ) : (
+                                <div>
+                                    <p className="text-gray-400 text-sm">Payment Type</p>
+                                    <p className="text-xl font-bold text-white">One-time</p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="mb-4">
@@ -510,6 +579,9 @@ export default function SuggestionsManager() {
                                 </span>
                             </div>
                             <p className="text-gray-300">{currentSuggestion.reason}</p>
+                            {currentSuggestion.explanation && (
+                                <p className="text-gray-400 text-sm mt-2">{currentSuggestion.explanation}</p>
+                            )}
                         </div>
 
                         <div className="flex space-x-3">
@@ -548,8 +620,14 @@ export default function SuggestionsManager() {
                                         <div>
                                             <h4 className="text-white font-medium">{suggestion.productName}</h4>
                                             <p className="text-gray-400 text-sm">
-                                                ₹{suggestion.monthlyEMI.toFixed(0)}/month • {suggestion.duration} months
+                                                {suggestion.monthlyEMI > 0 && suggestion.duration > 0
+                                                    ? `₹${suggestion.monthlyEMI.toFixed(0)}/month • ${suggestion.duration} months`
+                                                    : `One-time • ₹${suggestion.fullPrice.toLocaleString()}`}
                                             </p>
+                                            <p className="text-gray-300 text-sm mt-2">{suggestion.reason}</p>
+                                            {suggestion.explanation && (
+                                                <p className="text-gray-400 text-xs mt-1">{suggestion.explanation}</p>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="text-right">
@@ -730,9 +808,10 @@ export default function SuggestionsManager() {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 px-4 py-3 bg-[#F70000] hover:bg-red-700 text-white font-medium rounded-lg transition-colors duration-200"
+                                    disabled={loadingAI}
+                                    className="flex-1 px-4 py-3 bg-[#F70000] hover:bg-red-700 text-white font-medium rounded-lg transition-colors duration-200 disabled:opacity-50"
                                 >
-                                    Get Suggestion
+                                    {loadingAI ? 'Getting…' : 'Get Suggestion'}
                                 </button>
                             </div>
                         </form>

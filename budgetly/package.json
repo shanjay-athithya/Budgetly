@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@google/genai": "^1.22.0",
     "@heroicons/react": "^2.2.0",
     "chart.js": "^4.5.0",
     "firebase": "^10.14.1",

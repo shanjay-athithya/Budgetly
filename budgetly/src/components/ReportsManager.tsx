@@ -78,6 +78,7 @@ export default function ReportsManager() {
     }, [currentMonth]);
     const [monthlyReports, setMonthlyReports] = useState<{ [key: string]: MonthlyReport }>({});
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const [insight, setInsight] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
     // Generate monthly reports from user data
@@ -137,6 +138,26 @@ export default function ReportsManager() {
     useEffect(() => {
         generateReports();
     }, [generateReports]);
+
+    // Fetch AI insight for selected month
+    useEffect(() => {
+        const fetchInsight = async () => {
+            try {
+                if (!user || !selectedMonth) return;
+                const res = await fetch('/api/reports/insight', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uid: user.uid, month: selectedMonth })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                setInsight(data.insight as string);
+            } catch (e: unknown) {
+                setInsight(null);
+            }
+        };
+        fetchInsight();
+    }, [user, selectedMonth]);
 
     // Get current month's report
     const currentReport = useMemo(() => {
@@ -351,6 +372,16 @@ export default function ReportsManager() {
                         </div>
                     </div>
                 </div>
+
+                <!-- AI Monthly Insight -->
+                ${insight ? `
+                <div style="margin-bottom: 30px;">
+                    <h2 style="color: #FFFFFF; font-size: 24px; margin: 0 0 10px 0; border-bottom: 1px solid #383838; padding-bottom: 10px;">Monthly Insight</h2>
+                    <div style="background: #232326; padding: 16px; border-radius: 12px; border: 1px solid #383838; color: #D1D5DB;">
+                        ${insight.replace(/</g, '&lt;')}
+                    </div>
+                </div>
+                ` : ''}
 
                 <!-- Detailed Breakdown -->
                 <div style="margin-bottom: 40px;">
